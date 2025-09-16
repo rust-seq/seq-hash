@@ -1,8 +1,10 @@
 #![allow(unreachable_code)]
 
+mod anti_lex;
 mod intrinsics;
 mod nthash;
 
+pub use anti_lex::AntiLexHasher;
 pub use nthash::{MulHasher, NtHasher};
 use packed_seq::{ChunkIt, Delay, PaddedIt, Seq};
 use std::iter::{repeat, zip};
@@ -14,6 +16,12 @@ pub trait KmerHasher {
 
     /// The hasher is already initialized with the value of k.
     fn k(&self) -> usize;
+
+    /// The delay of the 'out' character when `MAPPER_NEEDS_OUT` is true.
+    /// Defaults to `k-1`.
+    fn delay(&self) -> Delay {
+        Delay(self.k() - 1)
+    }
 
     /// Add one character to the hash.
     fn mapper(&self) -> impl FnMut(u8) -> u32;
@@ -46,7 +54,8 @@ pub trait KmerHasher {
     /// Hash all k-mers in the given sequence, using 4 lanes in parallel.
     fn hash_kmers_simd<'s>(&self, seq: impl Seq<'s>, context: usize) -> PaddedIt<impl ChunkIt<S>> {
         let k = self.k();
-        seq.par_iter_bp_delayed(context + k - 1, Delay(k - 1))
+        let delay = self.delay();
+        seq.par_iter_bp_delayed(context + k - 1, delay)
             .map(self.in_out_mapper_simd())
             .advance(k - 1)
     }
