@@ -80,7 +80,7 @@ impl KmerHasher for AntiLexHasher<true> {
     }
 
     fn delay(&self) -> Delay {
-        Delay(self.k - 32 / self.b)
+        Delay(self.k.saturating_sub(32 / self.b))
     }
 
     fn mapper(&self) -> impl FnMut(u8) -> u32 {

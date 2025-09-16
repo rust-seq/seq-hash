@@ -42,12 +42,18 @@ pub trait KmerHasher {
     /// Hash all k-mers in the given sequence.
     fn hash_kmers_scalar<'s>(&self, seq: impl Seq<'s>) -> impl ExactSizeIterator<Item = u32> {
         let k = self.k();
+        let delay = self.delay();
         let mut add = seq.iter_bp();
-        let remove = seq.iter_bp();
+        let mut remove = seq.iter_bp();
         let mut mapper = self.in_out_mapper_scalar();
-        zip(add.by_ref().take(k - 1), repeat(0)).for_each(|a| {
+        zip(add.by_ref().take(delay.0), repeat(0)).for_each(|a| {
             mapper(a);
         });
+        zip(add.by_ref(), remove.by_ref())
+            .take(k - 1 - delay.0)
+            .for_each(|a| {
+                mapper(a);
+            });
         zip(add, remove).map(mapper)
     }
 
