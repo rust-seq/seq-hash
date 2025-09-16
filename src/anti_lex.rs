@@ -20,6 +20,7 @@ pub struct AntiLexHasher<const RC: bool> {
 }
 
 impl<const RC: bool> AntiLexHasher<RC> {
+    #[inline(always)]
     pub fn new(k: usize) -> Self {
         let b = 2;
         let shift = if b * k <= 32 { b * (k - 1) } else { 32 - b } as u32;
@@ -42,10 +43,12 @@ impl<const RC: bool> AntiLexHasher<RC> {
 impl KmerHasher for AntiLexHasher<false> {
     const RC: bool = false;
 
+    #[inline(always)]
     fn k(&self) -> usize {
         self.k
     }
 
+    #[inline(always)]
     fn mapper<'s>(&self, seq: impl Seq<'s>) -> impl FnMut(u8) -> u32 {
         assert!(seq.bits_per_char() <= self.b);
         let k = seq.len();
@@ -63,6 +66,7 @@ impl KmerHasher for AntiLexHasher<false> {
         }
     }
 
+    #[inline(always)]
     fn in_out_mapper_scalar<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((u8, u8)) -> u32 {
         assert!(seq.bits_per_char() <= self.b);
 
@@ -73,6 +77,7 @@ impl KmerHasher for AntiLexHasher<false> {
         }
     }
 
+    #[inline(always)]
     fn in_out_mapper_simd<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((S, S)) -> S {
         assert!(seq.bits_per_char() <= self.b);
 
@@ -87,14 +92,17 @@ impl KmerHasher for AntiLexHasher<false> {
 impl KmerHasher for AntiLexHasher<true> {
     const RC: bool = true;
 
+    #[inline(always)]
     fn k(&self) -> usize {
         self.k
     }
 
+    #[inline(always)]
     fn delay(&self) -> Delay {
         Delay(self.k.saturating_sub(32 / self.b))
     }
 
+    #[inline(always)]
     fn mapper<'s>(&self, seq: impl Seq<'s>) -> impl FnMut(u8) -> u32 {
         assert!(seq.bits_per_char() <= self.b);
         let mut shift = 0;
@@ -126,6 +134,7 @@ impl KmerHasher for AntiLexHasher<true> {
         }
     }
 
+    #[inline(always)]
     fn in_out_mapper_scalar<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((u8, u8)) -> u32 {
         assert!(seq.bits_per_char() <= self.b);
 
@@ -139,6 +148,7 @@ impl KmerHasher for AntiLexHasher<true> {
         }
     }
 
+    #[inline(always)]
     fn in_out_mapper_simd<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((S, S)) -> S {
         assert!(seq.bits_per_char() <= self.b);
 

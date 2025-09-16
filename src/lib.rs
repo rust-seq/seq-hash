@@ -15,6 +15,7 @@ pub trait KmerHasher {
     /// True when the hash function is invariant under reverse-complement.
     const RC: bool;
 
+    #[inline(always)]
     fn is_canonical(&self) -> bool {
         Self::RC
     }
@@ -22,8 +23,9 @@ pub trait KmerHasher {
     /// The hasher is already initialized with the value of k.
     fn k(&self) -> usize;
 
-    /// The delay of the 'out' character when `MAPPER_NEEDS_OUT` is true.
+    /// The delay of the 'out' character passed to the `in_out_mapper` functions.
     /// Defaults to `k-1`.
+    #[inline(always)]
     fn delay(&self) -> Delay {
         Delay(self.k() - 1)
     }
@@ -36,15 +38,18 @@ pub trait KmerHasher {
     fn in_out_mapper_simd<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((S, S)) -> S;
 
     /// Hash the given sequence/kmer.
+    #[inline(always)]
     fn hash_kmer<'s>(&self, seq: impl Seq<'s>) -> u32 {
         seq.iter_bp().map(self.mapper(seq)).last().unwrap_or(0)
     }
     /// Hash all non-empty prefixes of the given sequence.
+    #[inline(always)]
     fn hash_prefixes<'s>(&self, seq: impl Seq<'s>) -> impl ExactSizeIterator<Item = u32> {
         seq.iter_bp().map(self.mapper(seq))
     }
 
     /// Hash all k-mers in the given sequence.
+    #[inline(always)]
     fn hash_kmers_scalar<'s>(&self, seq: impl Seq<'s>) -> impl ExactSizeIterator<Item = u32> {
         let k = self.k();
         let delay = self.delay();
@@ -63,6 +68,7 @@ pub trait KmerHasher {
     }
 
     /// Hash all k-mers in the given sequence, using 4 lanes in parallel.
+    #[inline(always)]
     fn hash_kmers_simd<'s>(&self, seq: impl Seq<'s>, context: usize) -> PaddedIt<impl ChunkIt<S>> {
         let k = self.k();
         let delay = self.delay();

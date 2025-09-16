@@ -39,6 +39,7 @@ pub trait CharHasher: Clone {
     fn simd_f_rot(&self, b: u32x8) -> u32x8;
     fn simd_c_rot(&self, b: u32x8) -> u32x8;
 
+    #[inline(always)]
     fn fw_init(&self) -> u32 {
         let mut fw = 0u32;
         for _ in 0..self.k() - 1 {
@@ -46,6 +47,7 @@ pub trait CharHasher: Clone {
         }
         fw
     }
+    #[inline(always)]
     fn rc_init(&self) -> u32 {
         let mut rc = 0u32;
         for _ in 0..self.k() - 1 {
@@ -71,6 +73,7 @@ pub struct NtHasher<const RC: bool> {
 }
 
 impl<const RC: bool> NtHasher<RC> {
+    #[inline(always)]
     pub fn new(k: usize) -> Self {
         CharHasher::new(k)
     }
@@ -80,6 +83,7 @@ impl<const RC: bool> CharHasher for NtHasher<RC> {
     const RC: bool = RC;
     const BITS_PER_CHAR: usize = 2;
 
+    #[inline(always)]
     fn new_with_seed(k: usize, seed: Option<u32>) -> Self {
         // FIXME: Assert that the corresponding sequence type has 2 bits per character.
 
@@ -111,32 +115,41 @@ impl<const RC: bool> CharHasher for NtHasher<RC> {
         }
     }
 
+    #[inline(always)]
     fn k(&self) -> usize {
         self.k
     }
 
+    #[inline(always)]
     fn f(&self, b: u8) -> u32 {
         unsafe { *self.f.get_unchecked(b as usize) }
     }
+    #[inline(always)]
     fn c(&self, b: u8) -> u32 {
         unsafe { *self.c.get_unchecked(b as usize) }
     }
+    #[inline(always)]
     fn f_rot(&self, b: u8) -> u32 {
         unsafe { *self.f_rot.get_unchecked(b as usize) }
     }
+    #[inline(always)]
     fn c_rot(&self, b: u8) -> u32 {
         unsafe { *self.c_rot.get_unchecked(b as usize) }
     }
 
+    #[inline(always)]
     fn simd_f(&self, b: u32x8) -> u32x8 {
         intrinsics::table_lookup(self.simd_f, b)
     }
+    #[inline(always)]
     fn simd_c(&self, b: u32x8) -> u32x8 {
         intrinsics::table_lookup(self.simd_c, b)
     }
+    #[inline(always)]
     fn simd_f_rot(&self, b: u32x8) -> u32x8 {
         intrinsics::table_lookup(self.simd_f_rot, b)
     }
+    #[inline(always)]
     fn simd_c_rot(&self, b: u32x8) -> u32x8 {
         intrinsics::table_lookup(self.simd_c_rot, b)
     }
@@ -150,6 +163,7 @@ pub struct MulHasher<const RC: bool> {
 }
 
 impl<const RC: bool> MulHasher<RC> {
+    #[inline(always)]
     pub fn new(k: usize) -> Self {
         CharHasher::new(k)
     }
@@ -162,6 +176,7 @@ impl<const RC: bool> CharHasher for MulHasher<RC> {
     const RC: bool = RC;
     const BITS_PER_CHAR: usize = 8;
 
+    #[inline(always)]
     fn new_with_seed(k: usize, seed: Option<u32>) -> Self {
         Self {
             k,
@@ -174,36 +189,45 @@ impl<const RC: bool> CharHasher for MulHasher<RC> {
         }
     }
 
+    #[inline(always)]
     fn k(&self) -> usize {
         self.k
     }
 
+    #[inline(always)]
     fn f(&self, b: u8) -> u32 {
         (b as u32).wrapping_mul(self.mul)
     }
+    #[inline(always)]
     fn c(&self, b: u8) -> u32 {
         (complement_base(b) as u32).wrapping_mul(self.mul)
     }
+    #[inline(always)]
     fn f_rot(&self, b: u8) -> u32 {
         (b as u32).wrapping_mul(self.mul).rotate_left(self.rot * R)
     }
+    #[inline(always)]
     fn c_rot(&self, b: u8) -> u32 {
         (complement_base(b) as u32)
             .wrapping_mul(self.mul)
             .rotate_left(self.rot * R)
     }
 
+    #[inline(always)]
     fn simd_f(&self, b: u32x8) -> u32x8 {
         b * self.mul.into()
     }
+    #[inline(always)]
     fn simd_c(&self, b: u32x8) -> u32x8 {
         packed_seq::complement_base_simd(b) * self.mul.into()
     }
+    #[inline(always)]
     fn simd_f_rot(&self, b: u32x8) -> u32x8 {
         let r = b * self.mul.into();
         let rot = self.rot * R % 32;
         (r << rot) | (r >> (32 - rot))
     }
+    #[inline(always)]
     fn simd_c_rot(&self, b: u32x8) -> u32x8 {
         let r = packed_seq::complement_base_simd(b) * self.mul.into();
         let rot = self.rot * R % 32;
