@@ -44,11 +44,7 @@ pub trait KmerHasher {
     }
 
     /// Hash all k-mers in the given sequence, using 4 lanes in parallel.
-    fn hash_kmers_simd<'s>(
-        &self,
-        seq: impl Seq<'s>,
-        context: usize,
-    ) -> PaddedIt<impl ChunkIt<S>> {
+    fn hash_kmers_simd<'s>(&self, seq: impl Seq<'s>, context: usize) -> PaddedIt<impl ChunkIt<S>> {
         let k = self.k();
         seq.par_iter_bp_delayed(context + k - 1, Delay(k - 1))
             .map(self.in_out_mapper_simd())

@@ -1,11 +1,16 @@
 //! NtHash the kmers in a sequence.
 use std::array::from_fn;
+use std::hash::BuildHasher;
+use std::hash::BuildHasherDefault;
+use std::hash::DefaultHasher;
 
 use super::intrinsics;
 use crate::KmerHasher;
 use crate::S;
 use packed_seq::complement_base;
 use wide::u32x8;
+
+type SeedHasher = BuildHasherDefault<DefaultHasher>;
 
 /// Original ntHash seed values.
 // TODO: Update to guarantee unique hash values for k<=16?
@@ -18,7 +23,10 @@ const HASHES_F: [u32; 4] = [
 
 pub trait CharHasher: Clone {
     const RC: bool;
-    fn new(k: usize) -> Self;
+    fn new(k: usize) -> Self {
+        Self::new_with_seed(k, None)
+    }
+    fn new_with_seed(k: usize, seed: Option<u32>) -> Self;
     fn k(&self) -> usize;
     fn f(&self, b: u8) -> u32;
     fn c(&self, b: u8) -> u32;
@@ -55,12 +63,17 @@ impl<const RC: bool> NtHasher<RC> {
 
 impl<const RC: bool> CharHasher for NtHasher<RC> {
     const RC: bool = RC;
-    fn new(k: usize) -> Self {
+
+    fn new_with_seed(k: usize, seed: Option<u32>) -> Self {
         // FIXME: Assert that the corresponding sequence type has 2 bits per character.
 
         let rot = k as u32 - 1;
-        let f = HASHES_F;
-        let c = from_fn(|i| HASHES_F[complement_base(i as u8) as usize]);
+        let hasher = SeedHasher::new();
+        let f = match seed {
+            None => HASHES_F,
+            Some(seed) => from_fn(|i| hasher.hash_one(HASHES_F[i] ^ seed) as u32),
+        };
+        let c = from_fn(|i| f[complement_base(i as u8) as usize]);
         let f_rot = f.map(|h| h.rotate_left(rot));
         let c_rot = c.map(|h| h.rotate_left(rot));
         let idx = [0, 1, 2, 3, 0, 1, 2, 3];
@@ -86,7 +99,6 @@ impl<const RC: bool> CharHasher for NtHasher<RC> {
             this.fw_init = this.fw_init.rotate_left(R) ^ this.f(0);
             this.rc_init = this.rc_init.rotate_right(R) ^ this.c_rot(0);
         }
-
         this
     }
 
@@ -125,6 +137,7 @@ impl<const RC: bool> CharHasher for NtHasher<RC> {
 pub struct MulHasher<const RC: bool> {
     k: usize,
     rot: u32,
+    mul: u32,
 }
 
 impl<const RC: bool> MulHasher<RC> {
@@ -138,44 +151,51 @@ const C: u32 = 0x517cc1b727220a95u64 as u32;
 
 impl<const RC: bool> CharHasher for MulHasher<RC> {
     const RC: bool = RC;
-    fn new(k: usize) -> Self {
+
+    fn new_with_seed(k: usize, seed: Option<u32>) -> Self {
         Self {
             k,
             rot: (k as u32 - 1) % 32,
+            mul: C ^ match seed {
+                None => 0,
+                // don't change parity,
+                Some(seed) => (SeedHasher::new().hash_one(seed) as u32) << 1,
+            },
         }
     }
+
     fn k(&self) -> usize {
         self.k
     }
 
     fn f(&self, b: u8) -> u32 {
-        (b as u32).wrapping_mul(C)
+        (b as u32).wrapping_mul(self.mul)
     }
     fn c(&self, b: u8) -> u32 {
-        (complement_base(b) as u32).wrapping_mul(C)
+        (complement_base(b) as u32).wrapping_mul(self.mul)
     }
     fn f_rot(&self, b: u8) -> u32 {
-        (b as u32).wrapping_mul(C).rotate_left(self.rot * R)
+        (b as u32).wrapping_mul(self.mul).rotate_left(self.rot * R)
     }
     fn c_rot(&self, b: u8) -> u32 {
         (complement_base(b) as u32)
-            .wrapping_mul(C)
+            .wrapping_mul(self.mul)
             .rotate_left(self.rot * R)
     }
 
     fn simd_f(&self, b: u32x8) -> u32x8 {
-        b * C.into()
+        b * self.mul.into()
     }
     fn simd_c(&self, b: u32x8) -> u32x8 {
-        packed_seq::complement_base_simd(b) * C.into()
+        packed_seq::complement_base_simd(b) * self.mul.into()
     }
     fn simd_f_rot(&self, b: u32x8) -> u32x8 {
-        let r = b * C.into();
+        let r = b * self.mul.into();
         let rot = self.rot * R % 32;
         (r << rot) | (r >> (32 - rot))
     }
     fn simd_c_rot(&self, b: u32x8) -> u32x8 {
-        let r = packed_seq::complement_base_simd(b) * C.into();
+        let r = packed_seq::complement_base_simd(b) * self.mul.into();
         let rot = self.rot * R % 32;
         (r << rot) | (r >> (32 - rot))
     }
