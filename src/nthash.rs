@@ -8,6 +8,7 @@ use super::intrinsics;
 use crate::KmerHasher;
 use crate::S;
 use packed_seq::complement_base;
+use packed_seq::Seq;
 use wide::u32x8;
 
 type SeedHasher = BuildHasherDefault<DefaultHasher>;
@@ -23,6 +24,7 @@ const HASHES_F: [u32; 4] = [
 
 pub trait CharHasher: Clone {
     const RC: bool;
+    const BITS_PER_CHAR: usize;
     fn new(k: usize) -> Self {
         Self::new_with_seed(k, None)
     }
@@ -63,6 +65,7 @@ impl<const RC: bool> NtHasher<RC> {
 
 impl<const RC: bool> CharHasher for NtHasher<RC> {
     const RC: bool = RC;
+    const BITS_PER_CHAR: usize = 2;
 
     fn new_with_seed(k: usize, seed: Option<u32>) -> Self {
         // FIXME: Assert that the corresponding sequence type has 2 bits per character.
@@ -151,6 +154,7 @@ const C: u32 = 0x517cc1b727220a95u64 as u32;
 
 impl<const RC: bool> CharHasher for MulHasher<RC> {
     const RC: bool = RC;
+    const BITS_PER_CHAR: usize = 8;
 
     fn new_with_seed(k: usize, seed: Option<u32>) -> Self {
         Self {
@@ -209,7 +213,9 @@ impl<CH: CharHasher> KmerHasher for CH {
     }
 
     #[inline(always)]
-    fn mapper(&self) -> impl FnMut(u8) -> u32 {
+    fn mapper<'s>(&self, seq: impl Seq<'s>) -> impl FnMut(u8) -> u32 {
+        assert!(seq.bits_per_char() <= CH::BITS_PER_CHAR);
+
         let mut fw = 0u32;
         let mut rc = 0u32;
         move |a| {
@@ -224,7 +230,9 @@ impl<CH: CharHasher> KmerHasher for CH {
     }
 
     #[inline(always)]
-    fn in_out_mapper_scalar(&self) -> impl FnMut((u8, u8)) -> u32 {
+    fn in_out_mapper_scalar<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((u8, u8)) -> u32 {
+        assert!(seq.bits_per_char() <= CH::BITS_PER_CHAR);
+
         let mut fw = 0u32;
         let mut rc = 0u32;
         for _ in 0..self.k() - 1 {
@@ -248,7 +256,9 @@ impl<CH: CharHasher> KmerHasher for CH {
     }
 
     #[inline(always)]
-    fn in_out_mapper_simd(&self) -> impl FnMut((S, S)) -> S {
+    fn in_out_mapper_simd<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((S, S)) -> S {
+        assert!(seq.bits_per_char() <= CH::BITS_PER_CHAR);
+
         let mut fw = 0u32;
         let mut rc = 0u32;
         for _ in 0..self.k() - 1 {

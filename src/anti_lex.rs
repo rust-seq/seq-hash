@@ -4,9 +4,9 @@
 
 use std::cmp::min;
 
-use packed_seq::Delay;
-
 use crate::{KmerHasher, S};
+use packed_seq::Delay;
+use packed_seq::Seq;
 
 pub struct AntiLexHasher<const RC: bool> {
     k: usize,
@@ -47,7 +47,9 @@ impl KmerHasher for AntiLexHasher<false> {
         self.k
     }
 
-    fn mapper(&self) -> impl FnMut(u8) -> u32 {
+    fn mapper<'s>(&self, seq: impl Seq<'s>) -> impl FnMut(u8) -> u32 {
+        assert!(seq.bits_per_char() <= self.b);
+
         let mut fw: u32 = 0;
         move |a| {
             fw = (fw >> self.b) ^ ((a as u32) << (32 - self.b));
@@ -55,7 +57,9 @@ impl KmerHasher for AntiLexHasher<false> {
         }
     }
 
-    fn in_out_mapper_scalar(&self) -> impl FnMut((u8, u8)) -> u32 {
+    fn in_out_mapper_scalar<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((u8, u8)) -> u32 {
+        assert!(seq.bits_per_char() <= self.b);
+
         let mut fw: u32 = 0;
         move |(a, _r)| {
             fw = (fw >> self.b) ^ ((a as u32) << self.shift);
@@ -63,7 +67,9 @@ impl KmerHasher for AntiLexHasher<false> {
         }
     }
 
-    fn in_out_mapper_simd(&self) -> impl FnMut((S, S)) -> S {
+    fn in_out_mapper_simd<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((S, S)) -> S {
+        assert!(seq.bits_per_char() <= self.b);
+
         let mut fw: S = S::splat(0);
         move |(a, _r)| {
             fw = (fw >> self.b as u32) ^ (a << self.shift);
@@ -83,12 +89,14 @@ impl KmerHasher for AntiLexHasher<true> {
         Delay(self.k.saturating_sub(32 / self.b))
     }
 
-    fn mapper(&self) -> impl FnMut(u8) -> u32 {
+    fn mapper<'s>(&self, _seq: impl Seq<'s>) -> impl FnMut(u8) -> u32 {
         unimplemented!();
         |_| unreachable!()
     }
 
-    fn in_out_mapper_scalar(&self) -> impl FnMut((u8, u8)) -> u32 {
+    fn in_out_mapper_scalar<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((u8, u8)) -> u32 {
+        assert!(seq.bits_per_char() <= self.b);
+
         let mut fw: u32 = 0;
         let mut rc: u32 = 0;
         move |(a, r)| {
@@ -99,7 +107,9 @@ impl KmerHasher for AntiLexHasher<true> {
         }
     }
 
-    fn in_out_mapper_simd(&self) -> impl FnMut((S, S)) -> S {
+    fn in_out_mapper_simd<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((S, S)) -> S {
+        assert!(seq.bits_per_char() <= self.b);
+
         let mut fw: S = S::splat(0);
         let mut rc: S = S::splat(0);
         move |(a, r)| {

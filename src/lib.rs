@@ -24,19 +24,19 @@ pub trait KmerHasher {
     }
 
     /// Add one character to the hash.
-    fn mapper(&self) -> impl FnMut(u8) -> u32;
+    fn mapper<'s>(&self, seq: impl Seq<'s>) -> impl FnMut(u8) -> u32;
     /// Hash k-mers given the new character and if needed the one k-1 behind to remove.
-    fn in_out_mapper_scalar(&self) -> impl FnMut((u8, u8)) -> u32;
+    fn in_out_mapper_scalar<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((u8, u8)) -> u32;
     /// Hash k-mers given the new character and if needed the one k-1 behind to remove, for each of 4 lanes.
-    fn in_out_mapper_simd(&self) -> impl FnMut((S, S)) -> S;
+    fn in_out_mapper_simd<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((S, S)) -> S;
 
     /// Hash the given sequence/kmer.
-    fn hash_seq<'s>(&self, seq: impl Seq<'s>) -> u32 {
-        seq.iter_bp().map(self.mapper()).last().unwrap_or(0)
+    fn hash_kmer<'s>(&self, seq: impl Seq<'s>) -> u32 {
+        seq.iter_bp().map(self.mapper(seq)).last().unwrap_or(0)
     }
     /// Hash all non-empty prefixes of the given sequence.
     fn hash_prefixes<'s>(&self, seq: impl Seq<'s>) -> impl ExactSizeIterator<Item = u32> {
-        seq.iter_bp().map(self.mapper())
+        seq.iter_bp().map(self.mapper(seq))
     }
 
     /// Hash all k-mers in the given sequence.
@@ -45,7 +45,7 @@ pub trait KmerHasher {
         let delay = self.delay();
         let mut add = seq.iter_bp();
         let mut remove = seq.iter_bp();
-        let mut mapper = self.in_out_mapper_scalar();
+        let mut mapper = self.in_out_mapper_scalar(seq);
         zip(add.by_ref().take(delay.0), repeat(0)).for_each(|a| {
             mapper(a);
         });
@@ -62,7 +62,7 @@ pub trait KmerHasher {
         let k = self.k();
         let delay = self.delay();
         seq.par_iter_bp_delayed(context + k - 1, delay)
-            .map(self.in_out_mapper_simd())
+            .map(self.in_out_mapper_simd(seq))
             .advance(k - 1)
     }
 }
