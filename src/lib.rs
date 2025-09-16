@@ -3,22 +3,24 @@
 mod intrinsics;
 mod nthash;
 
-use std::iter::{repeat, zip};
-
 pub use nthash::{MulHasher, NtHasher};
 use packed_seq::{ChunkIt, Delay, PaddedIt, Seq};
+use std::iter::{repeat, zip};
 type S = wide::u32x8;
 
 pub trait KmerHasher {
     /// True when the hash function is invariant under reverse-complement.
     const RC: bool;
 
+    /// The hasher is already initialized with the value of k.
+    fn k(&self) -> usize;
+
     /// Add one character to the hash.
     fn mapper(&self) -> impl FnMut(u8) -> u32;
     /// Hash k-mers given the new character and if needed the one k-1 behind to remove.
-    fn in_out_mapper_scalar(&self, k: usize) -> impl FnMut((u8, u8)) -> u32;
+    fn in_out_mapper_scalar(&self) -> impl FnMut((u8, u8)) -> u32;
     /// Hash k-mers given the new character and if needed the one k-1 behind to remove, for each of 4 lanes.
-    fn in_out_mapper_simd(&self, k: usize) -> impl FnMut((S, S)) -> S;
+    fn in_out_mapper_simd(&self) -> impl FnMut((S, S)) -> S;
 
     /// Hash the given sequence/kmer.
     fn hash_seq<'s>(&self, seq: impl Seq<'s>) -> u32 {
@@ -30,10 +32,11 @@ pub trait KmerHasher {
     }
 
     /// Hash all k-mers in the given sequence.
-    fn hash_kmers_scalar<'s>(&self, k: usize, seq: impl Seq<'s>) -> impl ExactSizeIterator<Item = u32> {
+    fn hash_kmers_scalar<'s>(&self, seq: impl Seq<'s>) -> impl ExactSizeIterator<Item = u32> {
+        let k = self.k();
         let mut add = seq.iter_bp();
         let remove = seq.iter_bp();
-        let mut mapper = self.in_out_mapper_scalar(k);
+        let mut mapper = self.in_out_mapper_scalar();
         zip(add.by_ref().take(k - 1), repeat(0)).for_each(|a| {
             mapper(a);
         });
@@ -44,11 +47,11 @@ pub trait KmerHasher {
     fn hash_kmers_simd<'s>(
         &self,
         seq: impl Seq<'s>,
-        k: usize,
         context: usize,
     ) -> PaddedIt<impl ChunkIt<S>> {
+        let k = self.k();
         seq.par_iter_bp_delayed(context + k - 1, Delay(k - 1))
-            .map(self.in_out_mapper_simd(k))
+            .map(self.in_out_mapper_simd())
             .advance(k - 1)
     }
 }
