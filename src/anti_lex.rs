@@ -5,8 +5,7 @@
 use std::cmp::min;
 
 use crate::{KmerHasher, S};
-use packed_seq::Delay;
-use packed_seq::Seq;
+use packed_seq::{Delay, Seq};
 
 pub struct AntiLexHasher<const RC: bool> {
     k: usize,
@@ -49,11 +48,18 @@ impl KmerHasher for AntiLexHasher<false> {
 
     fn mapper<'s>(&self, seq: impl Seq<'s>) -> impl FnMut(u8) -> u32 {
         assert!(seq.bits_per_char() <= self.b);
+        let k = seq.len();
+        let shift = if self.b * k <= 32 {
+            self.b * (k - 1)
+        } else {
+            32 - self.b
+        } as u32;
+        let anti = ((1 << self.b) - 1) << shift;
 
         let mut fw: u32 = 0;
         move |a| {
-            fw = (fw >> self.b) ^ ((a as u32) << (32 - self.b));
-            fw ^ self.anti
+            fw = (fw >> self.b) ^ ((a as u32) << shift);
+            fw ^ anti
         }
     }
 
@@ -89,9 +95,35 @@ impl KmerHasher for AntiLexHasher<true> {
         Delay(self.k.saturating_sub(32 / self.b))
     }
 
-    fn mapper<'s>(&self, _seq: impl Seq<'s>) -> impl FnMut(u8) -> u32 {
-        unimplemented!();
-        |_| unreachable!()
+    fn mapper<'s>(&self, seq: impl Seq<'s>) -> impl FnMut(u8) -> u32 {
+        assert!(seq.bits_per_char() <= self.b);
+        let mut shift = 0;
+        let mut anti = (1 << self.b) - 1;
+        let mut mask = anti;
+
+        let mut fw: u32 = 0;
+        let mut rc: u32 = 0;
+        let mut i = 0;
+        move |a| {
+            if i * self.b >= 32 {
+                fw >>= self.b;
+            }
+            fw ^= (a as u32) << shift;
+            if i * self.b < 32 {
+                // ^2 for complement.
+                rc = ((rc << self.b) & mask) ^ (a as u32 ^ 2);
+            }
+            let out = min(fw ^ anti, rc ^ anti);
+
+            if (i + 1) * self.b < 32 {
+                shift += self.b as u32;
+                anti <<= self.b;
+                mask = (mask << self.b) | ((1 << self.b) - 1);
+            }
+            i += 1;
+
+            out
+        }
     }
 
     fn in_out_mapper_scalar<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((u8, u8)) -> u32 {

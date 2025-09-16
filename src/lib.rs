@@ -8,11 +8,16 @@ pub use anti_lex::AntiLexHasher;
 pub use nthash::{MulHasher, NtHasher};
 use packed_seq::{ChunkIt, Delay, PaddedIt, Seq};
 use std::iter::{repeat, zip};
+
 type S = wide::u32x8;
 
 pub trait KmerHasher {
     /// True when the hash function is invariant under reverse-complement.
     const RC: bool;
+
+    fn is_canonical(&self) -> bool {
+        Self::RC
+    }
 
     /// The hasher is already initialized with the value of k.
     fn k(&self) -> usize;

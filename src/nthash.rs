@@ -38,6 +38,21 @@ pub trait CharHasher: Clone {
     fn simd_c(&self, b: u32x8) -> u32x8;
     fn simd_f_rot(&self, b: u32x8) -> u32x8;
     fn simd_c_rot(&self, b: u32x8) -> u32x8;
+
+    fn fw_init(&self) -> u32 {
+        let mut fw = 0u32;
+        for _ in 0..self.k() - 1 {
+            fw = fw.rotate_left(R) ^ self.f(0);
+        }
+        fw
+    }
+    fn rc_init(&self) -> u32 {
+        let mut rc = 0u32;
+        for _ in 0..self.k() - 1 {
+            rc = rc.rotate_right(R) ^ self.c_rot(0);
+        }
+        rc
+    }
 }
 
 const R: u32 = 7;
@@ -53,8 +68,6 @@ pub struct NtHasher<const RC: bool> {
     simd_c: u32x8,
     simd_f_rot: u32x8,
     simd_c_rot: u32x8,
-    fw_init: u32,
-    rc_init: u32,
 }
 
 impl<const RC: bool> NtHasher<RC> {
@@ -77,15 +90,15 @@ impl<const RC: bool> CharHasher for NtHasher<RC> {
             Some(seed) => from_fn(|i| hasher.hash_one(HASHES_F[i] ^ seed) as u32),
         };
         let c = from_fn(|i| f[complement_base(i as u8) as usize]);
-        let f_rot = f.map(|h| h.rotate_left(rot));
-        let c_rot = c.map(|h| h.rotate_left(rot));
+        let f_rot = f.map(|h| h.rotate_left(rot * R));
+        let c_rot = c.map(|h| h.rotate_left(rot * R));
         let idx = [0, 1, 2, 3, 0, 1, 2, 3];
         let simd_f = idx.map(|i| f[i]).into();
         let simd_c = idx.map(|i| c[i]).into();
         let simd_f_rot = idx.map(|i| f_rot[i]).into();
         let simd_c_rot = idx.map(|i| c_rot[i]).into();
 
-        let mut this = Self {
+        Self {
             k,
             f,
             c,
@@ -95,14 +108,7 @@ impl<const RC: bool> CharHasher for NtHasher<RC> {
             simd_c,
             simd_f_rot,
             simd_c_rot,
-            fw_init: 0,
-            rc_init: 0,
-        };
-        for _ in 0..k - 1 {
-            this.fw_init = this.fw_init.rotate_left(R) ^ this.f(0);
-            this.rc_init = this.rc_init.rotate_right(R) ^ this.c_rot(0);
         }
-        this
     }
 
     fn k(&self) -> usize {
@@ -220,7 +226,7 @@ impl<CH: CharHasher> KmerHasher for CH {
         let mut rc = 0u32;
         move |a| {
             fw = fw.rotate_left(R) ^ self.f(a);
-            if !Self::RC {
+            if Self::RC {
                 rc = rc.rotate_right(R) ^ self.c_rot(a);
                 fw.wrapping_add(rc)
             } else {
@@ -233,19 +239,13 @@ impl<CH: CharHasher> KmerHasher for CH {
     fn in_out_mapper_scalar<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((u8, u8)) -> u32 {
         assert!(seq.bits_per_char() <= CH::BITS_PER_CHAR);
 
-        let mut fw = 0u32;
-        let mut rc = 0u32;
-        for _ in 0..self.k() - 1 {
-            fw = fw.rotate_left(R) ^ self.f(0);
-            if Self::RC {
-                rc = rc.rotate_right(R) ^ self.c_rot(0);
-            }
-        }
+        let mut fw = self.fw_init();
+        let mut rc = self.rc_init();
 
         move |(a, r)| {
             let fw_out = fw.rotate_left(R) ^ self.f(a);
             fw = fw_out ^ self.f_rot(r);
-            if !Self::RC {
+            if Self::RC {
                 let rc_out = rc.rotate_right(R) ^ self.c_rot(a);
                 rc = rc_out ^ self.c(r);
                 fw_out.wrapping_add(rc_out)
@@ -258,18 +258,8 @@ impl<CH: CharHasher> KmerHasher for CH {
     #[inline(always)]
     fn in_out_mapper_simd<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((S, S)) -> S {
         assert!(seq.bits_per_char() <= CH::BITS_PER_CHAR);
-
-        let mut fw = 0u32;
-        let mut rc = 0u32;
-        for _ in 0..self.k() - 1 {
-            fw = fw.rotate_left(R) ^ self.f(0);
-            if Self::RC {
-                rc = rc.rotate_right(R) ^ self.c_rot(0);
-            }
-        }
-
-        let mut fw = S::splat(fw);
-        let mut rc = S::splat(rc);
+        let mut fw = S::splat(self.fw_init());
+        let mut rc = S::splat(self.rc_init());
 
         move |(a, r)| {
             let fw_out = ((fw << R) | (fw >> (32 - R))) ^ self.simd_f(a);
