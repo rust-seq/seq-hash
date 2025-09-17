@@ -24,6 +24,7 @@ const HASHES_F: [u32; 4] = [
 
 pub trait CharHasher: Clone {
     const RC: bool;
+    const R: u32;
     const BITS_PER_CHAR: usize;
     fn new(k: usize) -> Self {
         Self::new_with_seed(k, None)
@@ -43,7 +44,7 @@ pub trait CharHasher: Clone {
     fn fw_init(&self) -> u32 {
         let mut fw = 0u32;
         for _ in 0..self.k() - 1 {
-            fw = fw.rotate_left(R) ^ self.f(0);
+            fw = fw.rotate_left(Self::R) ^ self.f(0);
         }
         fw
     }
@@ -51,16 +52,14 @@ pub trait CharHasher: Clone {
     fn rc_init(&self) -> u32 {
         let mut rc = 0u32;
         for _ in 0..self.k() - 1 {
-            rc = rc.rotate_right(R) ^ self.c_rot(0);
+            rc = rc.rotate_right(Self::R) ^ self.c_rot(0);
         }
         rc
     }
 }
 
-const R: u32 = 7;
-
 #[derive(Clone)]
-pub struct NtHasher<const RC: bool> {
+pub struct NtHasher<const RC: bool, const R: u32 = 7> {
     k: usize,
     f: [u32; 4],
     c: [u32; 4],
@@ -72,21 +71,20 @@ pub struct NtHasher<const RC: bool> {
     simd_c_rot: u32x8,
 }
 
-impl<const RC: bool> NtHasher<RC> {
+impl<const RC: bool, const R: u32> NtHasher<RC, R> {
     #[inline(always)]
     pub fn new(k: usize) -> Self {
         CharHasher::new(k)
     }
 }
 
-impl<const RC: bool> CharHasher for NtHasher<RC> {
+impl<const RC: bool, const R: u32> CharHasher for NtHasher<RC, R> {
     const RC: bool = RC;
+    const R: u32 = R;
     const BITS_PER_CHAR: usize = 2;
 
     #[inline(always)]
     fn new_with_seed(k: usize, seed: Option<u32>) -> Self {
-        // FIXME: Assert that the corresponding sequence type has 2 bits per character.
-
         let rot = k as u32 - 1;
         let hasher = SeedHasher::new();
         let f = match seed {
@@ -156,13 +154,13 @@ impl<const RC: bool> CharHasher for NtHasher<RC> {
 }
 
 #[derive(Clone)]
-pub struct MulHasher<const RC: bool> {
+pub struct MulHasher<const RC: bool, const R: u32 = 7> {
     k: usize,
     rot: u32,
     mul: u32,
 }
 
-impl<const RC: bool> MulHasher<RC> {
+impl<const RC: bool, const R: u32> MulHasher<RC, R> {
     #[inline(always)]
     pub fn new(k: usize) -> Self {
         CharHasher::new(k)
@@ -172,8 +170,9 @@ impl<const RC: bool> MulHasher<RC> {
 // Mixing constant.
 const C: u32 = 0x517cc1b727220a95u64 as u32;
 
-impl<const RC: bool> CharHasher for MulHasher<RC> {
+impl<const RC: bool, const R: u32> CharHasher for MulHasher<RC, R> {
     const RC: bool = RC;
+    const R: u32 = R;
     const BITS_PER_CHAR: usize = 8;
 
     #[inline(always)]
@@ -249,9 +248,9 @@ impl<CH: CharHasher> KmerHasher for CH {
         let mut fw = 0u32;
         let mut rc = 0u32;
         move |a| {
-            fw = fw.rotate_left(R) ^ self.f(a);
+            fw = fw.rotate_left(CH::R) ^ self.f(a);
             if Self::RC {
-                rc = rc.rotate_right(R) ^ self.c_rot(a);
+                rc = rc.rotate_right(CH::R) ^ self.c_rot(a);
                 fw.wrapping_add(rc)
             } else {
                 fw
@@ -267,10 +266,10 @@ impl<CH: CharHasher> KmerHasher for CH {
         let mut rc = self.rc_init();
 
         move |(a, r)| {
-            let fw_out = fw.rotate_left(R) ^ self.f(a);
+            let fw_out = fw.rotate_left(CH::R) ^ self.f(a);
             fw = fw_out ^ self.f_rot(r);
             if Self::RC {
-                let rc_out = rc.rotate_right(R) ^ self.c_rot(a);
+                let rc_out = rc.rotate_right(CH::R) ^ self.c_rot(a);
                 rc = rc_out ^ self.c(r);
                 fw_out.wrapping_add(rc_out)
             } else {
@@ -286,10 +285,10 @@ impl<CH: CharHasher> KmerHasher for CH {
         let mut rc = S::splat(self.rc_init());
 
         move |(a, r)| {
-            let fw_out = ((fw << R) | (fw >> (32 - R))) ^ self.simd_f(a);
+            let fw_out = ((fw << CH::R) | (fw >> (32 - CH::R))) ^ self.simd_f(a);
             fw = fw_out ^ self.simd_f_rot(r);
             if Self::RC {
-                let rc_out = ((rc >> R) | (rc << (32 - R))) ^ self.simd_c_rot(a);
+                let rc_out = ((rc >> CH::R) | (rc << (32 - CH::R))) ^ self.simd_c_rot(a);
                 rc = rc_out ^ self.simd_c(r);
                 // Wrapping SIMD add
                 fw_out + rc_out
