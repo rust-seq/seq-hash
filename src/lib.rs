@@ -15,11 +15,11 @@ type S = wide::u32x8;
 
 pub trait KmerHasher {
     /// True when the hash function is invariant under reverse-complement.
-    const RC: bool;
+    const CANONICAL: bool;
 
     #[inline(always)]
     fn is_canonical(&self) -> bool {
-        Self::RC
+        Self::CANONICAL
     }
 
     /// The hasher is already initialized with the value of k.

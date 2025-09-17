@@ -7,7 +7,7 @@ use std::cmp::min;
 use crate::{KmerHasher, S};
 use packed_seq::{Delay, Seq};
 
-pub struct AntiLexHasher<const RC: bool> {
+pub struct AntiLexHasher<const CANONICAL: bool> {
     k: usize,
     /// Number of bits of each character.
     b: usize,
@@ -19,7 +19,7 @@ pub struct AntiLexHasher<const RC: bool> {
     mask: u32,
 }
 
-impl<const RC: bool> AntiLexHasher<RC> {
+impl<const CANONICAL: bool> AntiLexHasher<CANONICAL> {
     #[inline(always)]
     pub fn new(k: usize) -> Self {
         let b = 2;
@@ -41,7 +41,7 @@ impl<const RC: bool> AntiLexHasher<RC> {
 }
 
 impl KmerHasher for AntiLexHasher<false> {
-    const RC: bool = false;
+    const CANONICAL: bool = false;
 
     #[inline(always)]
     fn k(&self) -> usize {
@@ -90,7 +90,7 @@ impl KmerHasher for AntiLexHasher<false> {
 }
 
 impl KmerHasher for AntiLexHasher<true> {
-    const RC: bool = true;
+    const CANONICAL: bool = true;
 
     #[inline(always)]
     fn k(&self) -> usize {

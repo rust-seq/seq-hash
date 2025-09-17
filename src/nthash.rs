@@ -23,7 +23,7 @@ const HASHES_F: [u32; 4] = [
 ];
 
 pub trait CharHasher: Clone {
-    const RC: bool;
+    const CANONICAL: bool;
     const R: u32;
     const BITS_PER_CHAR: usize;
     fn new(k: usize) -> Self {
@@ -59,7 +59,7 @@ pub trait CharHasher: Clone {
 }
 
 #[derive(Clone)]
-pub struct NtHasher<const RC: bool, const R: u32 = 7> {
+pub struct NtHasher<const CANONICAL: bool = true, const R: u32 = 7> {
     k: usize,
     f: [u32; 4],
     c: [u32; 4],
@@ -71,15 +71,15 @@ pub struct NtHasher<const RC: bool, const R: u32 = 7> {
     simd_c_rot: u32x8,
 }
 
-impl<const RC: bool, const R: u32> NtHasher<RC, R> {
+impl<const CANONICAL: bool, const R: u32> NtHasher<CANONICAL, R> {
     #[inline(always)]
     pub fn new(k: usize) -> Self {
         CharHasher::new(k)
     }
 }
 
-impl<const RC: bool, const R: u32> CharHasher for NtHasher<RC, R> {
-    const RC: bool = RC;
+impl<const CANONICAL: bool, const R: u32> CharHasher for NtHasher<CANONICAL, R> {
+    const CANONICAL: bool = CANONICAL;
     const R: u32 = R;
     const BITS_PER_CHAR: usize = 2;
 
@@ -154,13 +154,13 @@ impl<const RC: bool, const R: u32> CharHasher for NtHasher<RC, R> {
 }
 
 #[derive(Clone)]
-pub struct MulHasher<const RC: bool, const R: u32 = 7> {
+pub struct MulHasher<const CANONICAL: bool, const R: u32 = 7> {
     k: usize,
     rot: u32,
     mul: u32,
 }
 
-impl<const RC: bool, const R: u32> MulHasher<RC, R> {
+impl<const CANONICAL: bool, const R: u32> MulHasher<CANONICAL, R> {
     #[inline(always)]
     pub fn new(k: usize) -> Self {
         CharHasher::new(k)
@@ -170,8 +170,8 @@ impl<const RC: bool, const R: u32> MulHasher<RC, R> {
 // Mixing constant.
 const C: u32 = 0x517cc1b727220a95u64 as u32;
 
-impl<const RC: bool, const R: u32> CharHasher for MulHasher<RC, R> {
-    const RC: bool = RC;
+impl<const CANONICAL: bool, const R: u32> CharHasher for MulHasher<CANONICAL, R> {
+    const CANONICAL: bool = CANONICAL;
     const R: u32 = R;
     const BITS_PER_CHAR: usize = 8;
 
@@ -235,7 +235,7 @@ impl<const RC: bool, const R: u32> CharHasher for MulHasher<RC, R> {
 }
 
 impl<CH: CharHasher> KmerHasher for CH {
-    const RC: bool = CH::RC;
+    const CANONICAL: bool = CH::CANONICAL;
 
     fn k(&self) -> usize {
         self.k()
@@ -249,7 +249,7 @@ impl<CH: CharHasher> KmerHasher for CH {
         let mut rc = 0u32;
         move |a| {
             fw = fw.rotate_left(CH::R) ^ self.f(a);
-            if Self::RC {
+            if Self::CANONICAL {
                 rc = rc.rotate_right(CH::R) ^ self.c_rot(a);
                 fw.wrapping_add(rc)
             } else {
@@ -268,7 +268,7 @@ impl<CH: CharHasher> KmerHasher for CH {
         move |(a, r)| {
             let fw_out = fw.rotate_left(CH::R) ^ self.f(a);
             fw = fw_out ^ self.f_rot(r);
-            if Self::RC {
+            if Self::CANONICAL {
                 let rc_out = rc.rotate_right(CH::R) ^ self.c_rot(a);
                 rc = rc_out ^ self.c(r);
                 fw_out.wrapping_add(rc_out)
@@ -287,7 +287,7 @@ impl<CH: CharHasher> KmerHasher for CH {
         move |(a, r)| {
             let fw_out = ((fw << CH::R) | (fw >> (32 - CH::R))) ^ self.simd_f(a);
             fw = fw_out ^ self.simd_f_rot(r);
-            if Self::RC {
+            if Self::CANONICAL {
                 let rc_out = ((rc >> CH::R) | (rc << (32 - CH::R))) ^ self.simd_c_rot(a);
                 rc = rc_out ^ self.simd_c(r);
                 // Wrapping SIMD add
