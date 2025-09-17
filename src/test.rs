@@ -1,5 +1,3 @@
-use crate::nthash::CharHasher;
-
 use super::*;
 use itertools::Itertools;
 use packed_seq::{AsciiSeq, AsciiSeqVec, PackedSeq, PackedSeqVec, SeqVec};
@@ -78,25 +76,25 @@ fn test_hash<H: KmerHasher>(hasher: impl Fn(usize) -> H, test_plaintext: bool) {
 #[test]
 fn nthash_forward() {
     test_hash(|k| NtHasher::<false>::new(k), false);
-    test_hash(|k| NtHasher::<false>::new_with_seed(k, Some(31415)), false);
+    test_hash(|k| NtHasher::<false>::new_with_seed(k, 31415), false);
 }
 
 #[test]
 fn nthash_canonical() {
     test_hash(|k| NtHasher::<true>::new(k), false);
-    test_hash(|k| NtHasher::<true>::new_with_seed(k, Some(31415)), false);
+    test_hash(|k| NtHasher::<true>::new_with_seed(k, 31415), false);
 }
 
 #[test]
 fn mulhash_forward() {
     test_hash(|k| MulHasher::<false>::new(k), false);
-    test_hash(|k| MulHasher::<false>::new_with_seed(k, Some(31415)), false);
+    test_hash(|k| MulHasher::<false>::new_with_seed(k, 31415), false);
 }
 
 #[test]
 fn mulhash_canonical() {
     test_hash(|k| MulHasher::<true>::new(k), false);
-    test_hash(|k| MulHasher::<true>::new_with_seed(k, Some(31415)), false);
+    test_hash(|k| MulHasher::<true>::new_with_seed(k, 31415), false);
 }
 
 #[test]
@@ -145,9 +143,9 @@ fn canonical_is_revcomp() {
 #[test]
 fn seeded() {
     test_on_inputs(|k, _slice, ascii_seq, packed_seq| {
-        let hasher1 = NtHasher::<true>::new_with_seed(k, None);
-        let hasher2 = NtHasher::<true>::new_with_seed(k, Some(31415));
-        let hasher3 = NtHasher::<true>::new_with_seed(k, Some(75765));
+        let hasher1 = NtHasher::<true>::new(k);
+        let hasher2 = NtHasher::<true>::new_with_seed(k, 31415);
+        let hasher3 = NtHasher::<true>::new_with_seed(k, 75765);
 
         let pos1 = hasher1.hash_kmers_simd(packed_seq, 1).collect();
         let pos2 = hasher2.hash_kmers_simd(packed_seq, 1).collect();

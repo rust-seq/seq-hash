@@ -102,6 +102,10 @@ impl<const CANONICAL: bool, const R: u32> NtHasher<CANONICAL, R> {
     pub fn new(k: usize) -> Self {
         CharHasher::new(k)
     }
+    #[inline(always)]
+    pub fn new_with_seed(k: usize, seed: u32) -> Self {
+        CharHasher::new_with_seed(k, Some(seed))
+    }
 }
 
 impl<const CANONICAL: bool, const R: u32> CharHasher for NtHasher<CANONICAL, R> {
@@ -195,6 +199,10 @@ impl<const CANONICAL: bool, const R: u32> MulHasher<CANONICAL, R> {
     #[inline(always)]
     pub fn new(k: usize) -> Self {
         CharHasher::new(k)
+    }
+    #[inline(always)]
+    pub fn new_with_seed(k: usize, seed: u32) -> Self {
+        CharHasher::new_with_seed(k, Some(seed))
     }
 }
 
