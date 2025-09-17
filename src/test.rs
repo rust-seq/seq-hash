@@ -53,7 +53,7 @@ fn test_hash<H: KmerHasher>(hasher: impl Fn(usize) -> H, test_plaintext: bool) {
         let naive = ascii_seq
             .0
             .windows(k)
-            .map(|seq| hasher.hash_kmer(AsciiSeq(seq)))
+            .map(|seq| hasher.hash_seq(AsciiSeq(seq)))
             .collect::<Vec<_>>();
         let scalar_ascii = hasher.hash_kmers_scalar(ascii_seq).collect::<Vec<_>>();
         let scalar_packed = hasher.hash_kmers_scalar(packed_seq).collect::<Vec<_>>();

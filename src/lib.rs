@@ -41,7 +41,7 @@ pub trait KmerHasher {
 
     /// Hash the given sequence/kmer.
     #[inline(always)]
-    fn hash_kmer<'s>(&self, seq: impl Seq<'s>) -> u32 {
+    fn hash_seq<'s>(&self, seq: impl Seq<'s>) -> u32 {
         seq.iter_bp().map(self.mapper(seq)).last().unwrap_or(0)
     }
     /// Hash all non-empty prefixes of the given sequence.
