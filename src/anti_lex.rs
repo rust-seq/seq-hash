@@ -1,4 +1,5 @@
-//! A fast implementation of 'anti lexicographic' hashing:
+//! 'Anti lexicographic' hashing:
+//!
 //! A kmer's hash found by reading it's characters right to left, and by inverting the last (most significant) character.
 //! When k > 16, only the last 16 characters are used.
 
@@ -7,6 +8,13 @@ use std::cmp::min;
 use crate::{KmerHasher, S};
 use packed_seq::{Delay, Seq};
 
+/// A hash function that compares strings reverse-lexicographically,
+/// with the last (most significant) character inverted.
+///
+/// Only supports 2-bit DNA sequences ([`packed_seq::AsciiSeq`] and [`packed_seq::PackedSeq`]).
+///
+/// The canonical version (with `CANONICAL=true`) returns the minimum of the forward and reverse-complement hashes.
+/// TODO: Test minimum vs maximum.
 pub struct AntiLexHasher<const CANONICAL: bool> {
     k: usize,
     /// Number of bits of each character.
@@ -20,6 +28,7 @@ pub struct AntiLexHasher<const CANONICAL: bool> {
 }
 
 impl<const CANONICAL: bool> AntiLexHasher<CANONICAL> {
+    /// Create a new [`AntiLexHasher`] for kmers of length `k`.
     #[inline(always)]
     pub fn new(k: usize) -> Self {
         let b = 2;
@@ -49,24 +58,6 @@ impl KmerHasher for AntiLexHasher<false> {
     }
 
     #[inline(always)]
-    fn mapper<'s>(&self, seq: impl Seq<'s>) -> impl FnMut(u8) -> u32 {
-        assert!(seq.bits_per_char() <= self.b);
-        let k = seq.len();
-        let shift = if self.b * k <= 32 {
-            self.b * (k - 1)
-        } else {
-            32 - self.b
-        } as u32;
-        let anti = ((1 << self.b) - 1) << shift;
-
-        let mut fw: u32 = 0;
-        move |a| {
-            fw = (fw >> self.b) ^ ((a as u32) << shift);
-            fw ^ anti
-        }
-    }
-
-    #[inline(always)]
     fn in_out_mapper_scalar<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((u8, u8)) -> u32 {
         assert!(seq.bits_per_char() <= self.b);
 
@@ -85,6 +76,24 @@ impl KmerHasher for AntiLexHasher<false> {
         move |(a, _r)| {
             fw = (fw >> self.b as u32) ^ (a << self.shift);
             fw ^ S::splat(self.anti)
+        }
+    }
+
+    #[inline(always)]
+    fn mapper<'s>(&self, seq: impl Seq<'s>) -> impl FnMut(u8) -> u32 {
+        assert!(seq.bits_per_char() <= self.b);
+        let k = seq.len();
+        let shift = if self.b * k <= 32 {
+            self.b * (k - 1)
+        } else {
+            32 - self.b
+        } as u32;
+        let anti = ((1 << self.b) - 1) << shift;
+
+        let mut fw: u32 = 0;
+        move |a| {
+            fw = (fw >> self.b) ^ ((a as u32) << shift);
+            fw ^ anti
         }
     }
 }

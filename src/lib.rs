@@ -1,4 +1,59 @@
-#![allow(unreachable_code)]
+//! A crate for streaming hashing of k-mers via `KmerHasher`.
+//!
+//! This builds on [`packed_seq`] and is used by e.g. [`simd_minimizers`].
+//!
+//! The default [`NtHasher`] is canonical.
+//! If that's not needed, [`NtHasher<false>`] will be slightly faster.
+//! For non-DNA sequences with >2-bit alphabets, use [`MulHasher`] instead.
+//!
+//! Note that [`KmerHasher`] objects need `k` on their construction, so that they can precompute required constants.
+//! Prefer reusing the same [`KmerHasher`].
+//!
+//! This crate also includes [`AntiLexHasher`], see [this blogpost](https://curiouscoding.nl/posts/practical-minimizers/).
+//!
+//! ## Typical usage
+//!
+//! Construct a default [`NtHasher`] via `let hasher = <NtHasher>::new(k)`.
+//! Then call either `hasher.hash_kmers_simd(seq, context)`,
+//! or use the underlying 'mapper' via `hasher.in_out_mapper_simd(seq)`.
+//! ```
+//! use packed_seq::{AsciiSeqVec, PackedSeqVec, SeqVec};
+//! use seq_hash::{KmerHasher, NtHasher};
+//! let k = 3;
+//!
+//! // Default `NtHasher` is canonical.
+//! let hasher = <NtHasher>::new(k);
+//! let kmer = PackedSeqVec::from_ascii(b"ACG");
+//! let kmer_rc = PackedSeqVec::from_ascii(b"CGT");
+//! // Normally, prefer `hash_kmers_simd` over `hash_seq`.
+//! assert_eq!(
+//!     hasher.hash_seq(kmer.as_slice()),
+//!     hasher.hash_seq(kmer_rc.as_slice())
+//! );
+//!
+//! let fwd_hasher = NtHasher::<false>::new(k);
+//! assert_ne!(
+//!     fwd_hasher.hash_seq(kmer.as_slice()),
+//!     fwd_hasher.hash_seq(kmer_rc.as_slice())
+//! );
+//!
+//! let seq = b"ACGGCAGCGCATATGTAGT";
+//! let ascii_seq = AsciiSeqVec::from_ascii(seq);
+//! let packed_seq = PackedSeqVec::from_ascii(seq);
+//!
+//! // hasher.hash_kmers_scalar(seq.as_slice()); // Panics since `NtHasher` does not support ASCII.
+//! let hashes_1: Vec<_> = hasher.hash_kmers_scalar(ascii_seq.as_slice()).collect();
+//! let hashes_2: Vec<_> = hasher.hash_kmers_scalar(packed_seq.as_slice()).collect();
+//! // Hashes are equal for [`packed_seq::AsciiSeq`] and [`packed_seq::PackedSeq`].
+//! assert_eq!(hashes_1, hashes_2);
+//! assert_eq!(hashes_1.len(), seq.len() - (k-1));
+//!
+//! // Consider a 'context' of a single kmer.
+//! let hashes_3: Vec<_> = hasher.hash_kmers_simd(ascii_seq.as_slice(), 1).collect();
+//! let hashes_4: Vec<_> = hasher.hash_kmers_simd(packed_seq.as_slice(), 1).collect();
+//! assert_eq!(hashes_1, hashes_3);
+//! assert_eq!(hashes_1, hashes_4);
+//! ```
 
 mod anti_lex;
 mod intrinsics;
@@ -8,21 +63,30 @@ mod test;
 
 pub use anti_lex::AntiLexHasher;
 pub use nthash::{MulHasher, NtHasher};
+
+/// Re-export of the `packed-seq` crate.
+pub use packed_seq;
+
 use packed_seq::{ChunkIt, Delay, PaddedIt, Seq};
 use std::iter::{repeat, zip};
 
 type S = wide::u32x8;
 
+/// A hasher that can hash all k-mers in a string.
+///
+/// Note that a `KmerHasher` must be initialized with a specific `k`,
+/// so that it can precompute associated constants.
 pub trait KmerHasher {
     /// True when the hash function is invariant under reverse-complement.
     const CANONICAL: bool;
 
+    /// Helper function returning [`Self::CANONICAL`].
     #[inline(always)]
     fn is_canonical(&self) -> bool {
         Self::CANONICAL
     }
 
-    /// The hasher is already initialized with the value of k.
+    /// The value of `k` for this hasher.
     fn k(&self) -> usize;
 
     /// The delay of the 'out' character passed to the `in_out_mapper` functions.
@@ -32,25 +96,18 @@ pub trait KmerHasher {
         Delay(self.k() - 1)
     }
 
-    /// Add one character to the hash.
-    fn mapper<'s>(&self, seq: impl Seq<'s>) -> impl FnMut(u8) -> u32;
-    /// Hash k-mers given the new character and if needed the one k-1 behind to remove.
+    /// A scalar mapper function that should be called with each `(in, out)` base.
+    ///
+    /// The delay should be [`Self::delay()`]. The first `delay` calls should have `out=0`.
+    /// `seq` is only used to ensure that the hasher can handle the underlying alphabet.
     fn in_out_mapper_scalar<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((u8, u8)) -> u32;
-    /// Hash k-mers given the new character and if needed the one k-1 behind to remove, for each of 4 lanes.
+    /// A SIMD mapper function that should be called with a `(in, out)` base per lane.
+    ///
+    /// The delay should be [`Self::delay()`]. The first `delay` calls should have `out=u32x8::splat(0)`.
+    /// `seq` is only used to ensure that the hasher can handle the underlying alphabet.
     fn in_out_mapper_simd<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((S, S)) -> S;
 
-    /// Hash the given sequence/kmer.
-    #[inline(always)]
-    fn hash_seq<'s>(&self, seq: impl Seq<'s>) -> u32 {
-        seq.iter_bp().map(self.mapper(seq)).last().unwrap_or(0)
-    }
-    /// Hash all non-empty prefixes of the given sequence.
-    #[inline(always)]
-    fn hash_prefixes<'s>(&self, seq: impl Seq<'s>) -> impl ExactSizeIterator<Item = u32> {
-        seq.iter_bp().map(self.mapper(seq))
-    }
-
-    /// Hash all k-mers in the given sequence.
+    /// A scalar iterator over all k-mer hashes in `seq`.
     #[inline(always)]
     fn hash_kmers_scalar<'s>(&self, seq: impl Seq<'s>) -> impl ExactSizeIterator<Item = u32> {
         let k = self.k();
@@ -69,7 +126,7 @@ pub trait KmerHasher {
         zip(add, remove).map(mapper)
     }
 
-    /// Hash all k-mers in the given sequence, using 4 lanes in parallel.
+    /// A SIMD-parallel iterator over all k-mer hashes in `seq`.
     #[inline(always)]
     fn hash_kmers_simd<'s>(&self, seq: impl Seq<'s>, context: usize) -> PaddedIt<impl ChunkIt<S>> {
         let k = self.k();
@@ -77,5 +134,23 @@ pub trait KmerHasher {
         seq.par_iter_bp_delayed(context + k - 1, delay)
             .map(self.in_out_mapper_simd(seq))
             .advance(k - 1)
+    }
+
+    /// Hash a sequence one character at a time. Ignores `k`.
+    ///
+    /// `seq` is only used to ensure that the hasher can handle the underlying alphabet.
+    fn mapper<'s>(&self, seq: impl Seq<'s>) -> impl FnMut(u8) -> u32;
+
+    /// Hash the given sequence. Ignores `k`.
+    ///
+    /// This is slightly inefficient because it recomputes the constants based on the sequence length.
+    #[inline(always)]
+    fn hash_seq<'s>(&self, seq: impl Seq<'s>) -> u32 {
+        seq.iter_bp().map(self.mapper(seq)).last().unwrap_or(0)
+    }
+    /// Hash all non-empty prefixes of the given sequence. Ignores `k`.
+    #[inline(always)]
+    fn hash_prefixes<'s>(&self, seq: impl Seq<'s>) -> impl ExactSizeIterator<Item = u32> {
+        seq.iter_bp().map(self.mapper(seq))
     }
 }

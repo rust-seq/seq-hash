@@ -22,24 +22,43 @@ const HASHES_F: [u32; 4] = [
     0x2955_49f5_4be2_4456u64 as u32,
 ];
 
+/// A helper trait that hashes a single character.
+///
+/// Can be either via [`NtHasher`], which only works for 2-bit alphabets,
+/// or [`MulHasher`], which always works but is slightly slower.
 pub trait CharHasher: Clone {
+    /// Whether the underlying hasher is invariant under reverse-complement.
     const CANONICAL: bool;
+    /// The number of bits to rotate the hash after each character.
     const R: u32;
+    /// The (maximum) number of bits each character may have.
     const BITS_PER_CHAR: usize;
+
     fn new(k: usize) -> Self {
         Self::new_with_seed(k, None)
     }
+    /// Seeded version.
     fn new_with_seed(k: usize, seed: Option<u32>) -> Self;
+    /// The underlying value of `k`.
     fn k(&self) -> usize;
+    /// Hash `b`.
     fn f(&self, b: u8) -> u32;
+    /// Hash the reverse complement of `b`.
     fn c(&self, b: u8) -> u32;
+    /// Hash `b`, left rotated by `(k-1)*R` steps.
     fn f_rot(&self, b: u8) -> u32;
+    /// Hash the reverse complement of `b`, right rotated by `(k-1)*R` steps.
     fn c_rot(&self, b: u8) -> u32;
+    /// SIMD-version of [`f()`], looking up 8 characters at a time.
     fn simd_f(&self, b: u32x8) -> u32x8;
+    /// SIMD-version of [`c()`], looking up 8 characters at a time.
     fn simd_c(&self, b: u32x8) -> u32x8;
+    /// SIMD-version of [`f_rot()`], looking up 8 characters at a time.
     fn simd_f_rot(&self, b: u32x8) -> u32x8;
+    /// SIMD-version of [`c_rot()`], looking up 8 characters at a time.
     fn simd_c_rot(&self, b: u32x8) -> u32x8;
 
+    /// Initial value of hashing `k-1` zeros.
     #[inline(always)]
     fn fw_init(&self) -> u32 {
         let mut fw = 0u32;
@@ -48,6 +67,8 @@ pub trait CharHasher: Clone {
         }
         fw
     }
+
+    /// Initial value of reverse-complement-hashing `k-1` zeros.
     #[inline(always)]
     fn rc_init(&self) -> u32 {
         let mut rc = 0u32;
@@ -58,6 +79,11 @@ pub trait CharHasher: Clone {
     }
 }
 
+/// `u32` variant of NtHash.
+///
+/// `CANONICAL` by default by summing forward and reverse-complement hash values.
+/// Instead of the classical 1-bit rotation, this rotates by `R=7` bits by default,
+/// to reduce correlation between high bits of consecutive hashes.
 #[derive(Clone)]
 pub struct NtHasher<const CANONICAL: bool = true, const R: u32 = 7> {
     k: usize,
@@ -153,8 +179,13 @@ impl<const CANONICAL: bool, const R: u32> CharHasher for NtHasher<CANONICAL, R> 
     }
 }
 
+/// `MulHasher` multiplies each character by a constant and xor's them together under rotations.
+///
+/// `CANONICAL` by default by summing forward and reverse-complement hash values.
+/// Instead of the classical 1-bit rotation, this rotates by `R=7` bits by default,
+/// to reduce correlation between high bits of consecutive hashes.
 #[derive(Clone)]
-pub struct MulHasher<const CANONICAL: bool, const R: u32 = 7> {
+pub struct MulHasher<const CANONICAL: bool = true, const R: u32 = 7> {
     k: usize,
     rot: u32,
     mul: u32,
@@ -242,23 +273,6 @@ impl<CH: CharHasher> KmerHasher for CH {
     }
 
     #[inline(always)]
-    fn mapper<'s>(&self, seq: impl Seq<'s>) -> impl FnMut(u8) -> u32 {
-        assert!(seq.bits_per_char() <= CH::BITS_PER_CHAR);
-
-        let mut fw = 0u32;
-        let mut rc = 0u32;
-        move |a| {
-            fw = fw.rotate_left(CH::R) ^ self.f(a);
-            if Self::CANONICAL {
-                rc = rc.rotate_right(CH::R) ^ self.c_rot(a);
-                fw.wrapping_add(rc)
-            } else {
-                fw
-            }
-        }
-    }
-
-    #[inline(always)]
     fn in_out_mapper_scalar<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((u8, u8)) -> u32 {
         assert!(seq.bits_per_char() <= CH::BITS_PER_CHAR);
 
@@ -294,6 +308,23 @@ impl<CH: CharHasher> KmerHasher for CH {
                 fw_out + rc_out
             } else {
                 fw_out
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn mapper<'s>(&self, seq: impl Seq<'s>) -> impl FnMut(u8) -> u32 {
+        assert!(seq.bits_per_char() <= CH::BITS_PER_CHAR);
+
+        let mut fw = 0u32;
+        let mut rc = 0u32;
+        move |a| {
+            fw = fw.rotate_left(CH::R) ^ self.f(a);
+            if Self::CANONICAL {
+                rc = rc.rotate_right(CH::R) ^ self.c_rot(a);
+                fw.wrapping_add(rc)
+            } else {
+                fw
             }
         }
     }
