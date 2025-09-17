@@ -3,6 +3,8 @@
 mod anti_lex;
 mod intrinsics;
 mod nthash;
+#[cfg(test)]
+mod test;
 
 pub use anti_lex::AntiLexHasher;
 pub use nthash::{MulHasher, NtHasher};
