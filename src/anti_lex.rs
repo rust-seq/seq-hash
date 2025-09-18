@@ -52,6 +52,10 @@ impl<const CANONICAL: bool> AntiLexHasher<CANONICAL> {
 impl KmerHasher for AntiLexHasher<false> {
     const CANONICAL: bool = false;
 
+    fn new(k: usize) -> Self {
+        Self::new(k)
+    }
+
     #[inline(always)]
     fn k(&self) -> usize {
         self.k
@@ -100,6 +104,10 @@ impl KmerHasher for AntiLexHasher<false> {
 
 impl KmerHasher for AntiLexHasher<true> {
     const CANONICAL: bool = true;
+
+    fn new(k: usize) -> Self {
+        Self::new(k)
+    }
 
     #[inline(always)]
     fn k(&self) -> usize {

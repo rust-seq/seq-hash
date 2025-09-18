@@ -276,6 +276,10 @@ impl<const CANONICAL: bool, const R: u32> CharHasher for MulHasher<CANONICAL, R>
 impl<CH: CharHasher> KmerHasher for CH {
     const CANONICAL: bool = CH::CANONICAL;
 
+    fn new(k: usize) -> Self {
+        Self::new(k)
+    }
+
     fn k(&self) -> usize {
         self.k()
     }

@@ -80,6 +80,8 @@ pub trait KmerHasher {
     /// True when the hash function is invariant under reverse-complement.
     const CANONICAL: bool;
 
+    fn new(k: usize) -> Self;
+
     /// Helper function returning [`Self::CANONICAL`].
     #[inline(always)]
     fn is_canonical(&self) -> bool {
