@@ -30,7 +30,7 @@ pub struct AntiLexHasher<const CANONICAL: bool> {
 impl<const CANONICAL: bool> AntiLexHasher<CANONICAL> {
     /// Create a new [`AntiLexHasher`] for kmers of length `k`.
     #[inline(always)]
-    pub fn new(k: usize) -> Self {
+    pub const fn new(k: usize) -> Self {
         let b = 2;
         let shift = if b * k <= 32 { b * (k - 1) } else { 32 - b } as u32;
         let anti = ((1 << b) - 1) << shift;

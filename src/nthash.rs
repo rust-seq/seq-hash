@@ -7,8 +7,8 @@ use std::hash::DefaultHasher;
 use super::intrinsics;
 use crate::KmerHasher;
 use crate::S;
-use packed_seq::complement_base;
 use packed_seq::Seq;
+use packed_seq::complement_base;
 use wide::u32x8;
 
 type SeedHasher = BuildHasherDefault<DefaultHasher>;

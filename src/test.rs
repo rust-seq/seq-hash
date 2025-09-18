@@ -1,7 +1,7 @@
 use super::*;
 use itertools::Itertools;
 use packed_seq::{AsciiSeq, AsciiSeqVec, PackedSeq, PackedSeqVec, SeqVec};
-use rand::{random_range, Rng};
+use rand::{Rng, random_range};
 use std::sync::LazyLock;
 
 /// Swap G and T, so that the lex order is the same as for the packed version.
@@ -75,36 +75,36 @@ fn test_hash<H: KmerHasher>(hasher: impl Fn(usize) -> H, test_plaintext: bool) {
 
 #[test]
 fn nthash_forward() {
-    test_hash(|k| NtHasher::<false>::new(k), false);
+    test_hash(NtHasher::<false>::new, false);
     test_hash(|k| NtHasher::<false>::new_with_seed(k, 31415), false);
 }
 
 #[test]
 fn nthash_canonical() {
-    test_hash(|k| NtHasher::<true>::new(k), false);
+    test_hash(NtHasher::<true>::new, false);
     test_hash(|k| NtHasher::<true>::new_with_seed(k, 31415), false);
 }
 
 #[test]
 fn mulhash_forward() {
-    test_hash(|k| MulHasher::<false>::new(k), false);
+    test_hash(MulHasher::<false>::new, false);
     test_hash(|k| MulHasher::<false>::new_with_seed(k, 31415), false);
 }
 
 #[test]
 fn mulhash_canonical() {
-    test_hash(|k| MulHasher::<true>::new(k), false);
+    test_hash(MulHasher::<true>::new, false);
     test_hash(|k| MulHasher::<true>::new_with_seed(k, 31415), false);
 }
 
 #[test]
 fn anti_lex_forward() {
-    test_hash(|k| AntiLexHasher::<false>::new(k), true);
+    test_hash(AntiLexHasher::<false>::new, true);
 }
 
 #[test]
 fn anti_lex_canonical() {
-    test_hash(|k| AntiLexHasher::<true>::new(k), true);
+    test_hash(AntiLexHasher::<true>::new, true);
 }
 
 #[test]
@@ -135,9 +135,9 @@ fn canonical_is_revcomp() {
             }
         }
     }
-    f(|k| NtHasher::<true>::new(k));
-    f(|k| MulHasher::<true>::new(k));
-    f(|k| AntiLexHasher::<true>::new(k));
+    f(NtHasher::<true>::new);
+    f(MulHasher::<true>::new);
+    f(AntiLexHasher::<true>::new);
 }
 
 #[test]
