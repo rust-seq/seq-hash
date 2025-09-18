@@ -67,7 +67,7 @@ pub use nthash::{MulHasher, NtHasher};
 /// Re-export of the `packed-seq` crate.
 pub use packed_seq;
 
-use packed_seq::{ChunkIt, Delay, PaddedIt, Seq};
+use packed_seq::{BitSeq, ChunkIt, Delay, PaddedIt, Seq};
 use std::iter::{repeat, zip};
 
 type S = wide::u32x8;
@@ -109,6 +109,42 @@ pub trait KmerHasher {
     /// `seq` is only used to ensure that the hasher can handle the underlying alphabet.
     fn in_out_mapper_simd<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((S, S)) -> S;
 
+    fn in_out_mapper_ambiguous_scalar<'s>(
+        &self,
+        seq: impl Seq<'s>,
+        ambiguous: &BitSeq<'s>,
+    ) -> impl FnMut((u8, u8)) -> u32 {
+        let mut mapper = self.in_out_mapper_scalar(seq);
+        let mut ambi = ambiguous.iter_kmer_ambiguity(self.k());
+        let k = self.k();
+        let mut i = 0;
+        move |(a, r)| {
+            let hash = mapper((a, r));
+            let ambi = if i > k - 1 {
+                ambi.next().unwrap()
+            } else {
+                false
+            };
+            i += 1;
+            if ambi { u32::MAX } else { hash }
+        }
+    }
+
+    fn in_out_mapper_ambiguous_simd<'s>(
+        &self,
+        seq: impl Seq<'s>,
+        ambiguous: &BitSeq<'s>,
+        context: usize,
+    ) -> impl FnMut((S, S)) -> S {
+        let mut mapper = self.in_out_mapper_simd(seq);
+        let mut ambi = ambiguous.par_iter_kmer_ambiguity(self.k(), context, 0);
+        move |(a, r)| {
+            let hash = mapper((a, r));
+            let ambi = ambi.it.next().unwrap();
+            ambi.blend(S::MAX, hash)
+        }
+    }
+
     /// A scalar iterator over all k-mer hashes in `seq`.
     #[inline(always)]
     fn hash_kmers_scalar<'s>(&self, seq: impl Seq<'s>) -> impl ExactSizeIterator<Item = u32> {
@@ -135,6 +171,57 @@ pub trait KmerHasher {
         let delay = self.delay();
         seq.par_iter_bp_delayed(context + k - 1, delay)
             .map(self.in_out_mapper_simd(seq))
+            .advance(k - 1)
+    }
+
+    /// An iterator over all k-mer hashes in `seq`.
+    /// Ambiguous kmers get hash u32::MAX.
+    #[inline(always)]
+    fn hash_valid_kmers_scalar<'s>(
+        &self,
+        seq: impl Seq<'s>,
+        ambiguous: &BitSeq<'s>,
+    ) -> impl ExactSizeIterator<Item = u32> {
+        let k = self.k();
+        let delay = self.delay();
+        assert!(delay.0 < k);
+
+        let mut mapper = self.in_out_mapper_scalar(seq);
+
+        let mut a = seq.iter_bp();
+        let mut r = seq.iter_bp();
+
+        a.by_ref().take(delay.0).for_each(|a| {
+            mapper((a, 0));
+        });
+
+        zip(a.by_ref(), r.by_ref())
+            .take((k - 1) - delay.0)
+            .for_each(|(a, r)| {
+                mapper((a, r));
+            });
+
+        zip(zip(a, r), ambiguous.iter_kmer_ambiguity(k)).map(move |(ar, ambi)| {
+            let hash = mapper(ar);
+            if ambi { u32::MAX } else { hash }
+        })
+    }
+
+    /// A SIMD-parallel iterator over all k-mer hashes in `seq`.
+    /// Ambiguous kmers get hash u32::MAX.
+    #[inline(always)]
+    fn hash_valid_kmers_simd<'s>(
+        &self,
+        seq: impl Seq<'s>,
+        ambiguous: &BitSeq<'s>,
+        context: usize,
+    ) -> PaddedIt<impl ChunkIt<S>> {
+        let k = self.k();
+        let delay = self.delay();
+        seq.par_iter_bp_delayed(context + k - 1, delay)
+            .map(self.in_out_mapper_simd(seq))
+            .zip(ambiguous.par_iter_kmer_ambiguity(k, context + k - 1, 0))
+            .map(|(hash, is_ambiguous)| is_ambiguous.blend(S::MAX, hash))
             .advance(k - 1)
     }
 
