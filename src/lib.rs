@@ -175,7 +175,7 @@ pub trait KmerHasher {
     }
 
     /// An iterator over all k-mer hashes in `seq`.
-    /// Ambiguous kmers get hash u32::MAX.
+    /// Ambiguous kmers get hash `u32::MAX`.
     #[inline(always)]
     fn hash_valid_kmers_scalar<'s>(
         &self,
@@ -208,7 +208,7 @@ pub trait KmerHasher {
     }
 
     /// A SIMD-parallel iterator over all k-mer hashes in `seq`.
-    /// Ambiguous kmers get hash u32::MAX.
+    /// Ambiguous kmers get hash `u32::MAX`.
     #[inline(always)]
     fn hash_valid_kmers_simd<'s>(
         &self,
