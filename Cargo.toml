@@ -16,3 +16,6 @@ wide = "0.7"
 [dev-dependencies]
 itertools = "0.14.0"
 rand = "0.9"
+
+[features]
+scalar = ["packed-seq/scalar"]
