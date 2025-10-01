@@ -76,9 +76,9 @@ dependencies = [
 
 [[package]]
 name = "packed-seq"
-version = "4.0.0"
+version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5958f4aaa8afc3f0ac843427539bc2e104ed5cfc277c220cc627d7fb7551c3d3"
+checksum = "d6068d1269dcc5bada0f62ae59349e223541c320c2f384cdcb364d3053aa52ac"
 dependencies = [
  "cfg-if",
  "mem_dbg",
@@ -106,9 +106,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.40"
+version = "1.0.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1885c039570dc00dcb4ff087a89e185fd56bae234ddc7f056a945bf36467248d"
+checksum = "ce25767e7b499d1b604768e7cde645d14cc8584231ea6b295e9c9eb22c02e1d1"
 dependencies = [
  "proc-macro2",
 ]
