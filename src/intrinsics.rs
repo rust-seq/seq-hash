@@ -2,6 +2,7 @@ use crate::S;
 
 /// Given a 'table' `t` consisting of 8 values, and an index `idx` consisting of 8 indices from 0 to 4,
 /// look up the first four indices in the first half of `t`, and the second four indices in the second half of `t`.
+#[inline(always)]
 pub fn table_lookup(t: S, idx: S) -> S {
     _table_lookup(t, idx)
 }
