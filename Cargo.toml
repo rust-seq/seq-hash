@@ -19,3 +19,7 @@ rand = "0.9"
 
 [features]
 scalar = ["packed-seq/scalar"]
+
+[profile.release]
+lto = true
+debug = false

@@ -159,3 +159,36 @@ fn seeded() {
         }
     });
 }
+
+#[test]
+#[ignore = "This is a benchmark, not a test"]
+fn hash_kmers_bench() {
+    eprintln!("\nBench SeqHash::hash_kmers_simd");
+
+    for k in [1, 31] {
+        eprintln!("\nk = {k}");
+
+        let hasher = NtHasher::<false>::new(k);
+
+        for len in [100, 150, 200, 1000, 1_000_000] {
+            // 1Gbp input.
+            let rep = 1_000_000_000 / len;
+            let seq = PackedSeqVec::random(len);
+
+            let start = std::time::Instant::now();
+            for _ in 0..rep {
+                let PaddedIt { it, .. } = hasher.hash_kmers_simd(seq.as_slice(), k);
+                it.for_each(
+                    #[inline(always)]
+                    |y| {
+                        core::hint::black_box(&y);
+                    },
+                );
+            }
+            eprintln!(
+                "Len {len:>7} => {:.03} Gbp/s",
+                start.elapsed().as_secs_f64().recip()
+            );
+        }
+    }
+}
