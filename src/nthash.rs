@@ -225,6 +225,7 @@ impl<const CANONICAL: bool, const R: u32> CharHasher for MulHasher<CANONICAL, R>
 
     #[inline(always)]
     fn new_with_seed(k: usize, seed: Option<u32>) -> Self {
+        let rot = (k as u32 - 1) % 32;
         let mul = C ^ match seed {
             None => 0,
             // don't change parity,
@@ -232,17 +233,23 @@ impl<const CANONICAL: bool, const R: u32> CharHasher for MulHasher<CANONICAL, R>
         };
 
         // Initial value of hashing `k-1` zeros.
-        let fw_init = 0u32;
+        let mut fw_init = 0u32;
+        for _ in 0..k - 1 {
+            fw_init = fw_init.rotate_left(Self::R) ^ (0 as u32).wrapping_mul(mul);
+        }
 
         // Initial value of reverse-complement-hashing `k-1` zeros.
         let mut rc_init = 0u32;
         for _ in 0..k - 1 {
-            rc_init = rc_init.rotate_right(Self::R) ^ (complement_base(0) as u32).wrapping_mul(mul);
+            rc_init = rc_init.rotate_right(Self::R)
+                ^ (complement_base(0) as u32)
+                    .wrapping_mul(mul)
+                    .rotate_left(rot * R);
         }
 
         Self {
             k,
-            rot: (k as u32 - 1) % 32,
+            rot,
             mul,
             fw_init,
             rc_init,
