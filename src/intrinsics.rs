@@ -28,9 +28,10 @@ fn _table_lookup(t: S, idx: S) -> S {
         use core::arch::aarch64::{uint8x16_t, vqtbl1q_u8};
         use core::mem::transmute;
 
-        const OFFSET: u32 = 0x03_02_01_00;
+        const OFFSET: S = unsafe { std::mem::transmute([0x03_02_01_00; 8]) };
+        const MASK: S = unsafe { std::mem::transmute([0x04_04_04_04; 8]) };
 
-        let idx = idx * S::splat(0x04_04_04_04) + S::splat(OFFSET);
+        let idx = idx * MASK + OFFSET;
         let (t1, t2): (uint8x16_t, uint8x16_t) = transmute(t);
         let (i1, i2): (uint8x16_t, uint8x16_t) = transmute(idx);
         let r1 = vqtbl1q_u8(t1, i1);
