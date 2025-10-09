@@ -76,9 +76,7 @@ dependencies = [
 
 [[package]]
 name = "packed-seq"
-version = "4.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6068d1269dcc5bada0f62ae59349e223541c320c2f384cdcb364d3053aa52ac"
+version = "4.1.1"
 dependencies = [
  "cfg-if",
  "mem_dbg",
