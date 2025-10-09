@@ -58,25 +58,8 @@ pub trait CharHasher: Clone {
     /// SIMD-version of [`c_rot()`], looking up 8 characters at a time.
     fn simd_c_rot(&self, b: u32x8) -> u32x8;
 
-    /// Initial value of hashing `k-1` zeros.
-    #[inline(always)]
-    fn fw_init(&self) -> u32 {
-        let mut fw = 0u32;
-        for _ in 0..self.k() - 1 {
-            fw = fw.rotate_left(Self::R) ^ self.f(0);
-        }
-        fw
-    }
-
-    /// Initial value of reverse-complement-hashing `k-1` zeros.
-    #[inline(always)]
-    fn rc_init(&self) -> u32 {
-        let mut rc = 0u32;
-        for _ in 0..self.k() - 1 {
-            rc = rc.rotate_right(Self::R) ^ self.c_rot(0);
-        }
-        rc
-    }
+    fn fw_init(&self) -> u32;
+    fn rc_init(&self) -> u32;
 }
 
 /// `u32` variant of NtHash.
@@ -95,6 +78,8 @@ pub struct NtHasher<const CANONICAL: bool = true, const R: u32 = 7> {
     simd_c: u32x8,
     simd_f_rot: u32x8,
     simd_c_rot: u32x8,
+    fw_init: u32,
+    rc_init: u32,
 }
 
 impl<const CANONICAL: bool, const R: u32> NtHasher<CANONICAL, R> {
@@ -130,6 +115,18 @@ impl<const CANONICAL: bool, const R: u32> CharHasher for NtHasher<CANONICAL, R> 
         let simd_f_rot = idx.map(|i| f_rot[i]).into();
         let simd_c_rot = idx.map(|i| c_rot[i]).into();
 
+        // Initial value of hashing `k-1` zeros.
+        let mut fw_init = 0u32;
+        for _ in 0..k - 1 {
+            fw_init = fw_init.rotate_left(Self::R) ^ f[0];
+        }
+
+        // Initial value of reverse-complement-hashing `k-1` zeros.
+        let mut rc_init = 0u32;
+        for _ in 0..k - 1 {
+            rc_init = rc_init.rotate_right(Self::R) ^ c_rot[0];
+        }
+
         Self {
             k,
             f,
@@ -140,6 +137,8 @@ impl<const CANONICAL: bool, const R: u32> CharHasher for NtHasher<CANONICAL, R> 
             simd_c,
             simd_f_rot,
             simd_c_rot,
+            fw_init,
+            rc_init,
         }
     }
 
@@ -181,6 +180,14 @@ impl<const CANONICAL: bool, const R: u32> CharHasher for NtHasher<CANONICAL, R> 
     fn simd_c_rot(&self, b: u32x8) -> u32x8 {
         intrinsics::table_lookup(self.simd_c_rot, b)
     }
+    #[inline(always)]
+    fn fw_init(&self) -> u32 {
+        self.fw_init
+    }
+    #[inline(always)]
+    fn rc_init(&self) -> u32 {
+        self.rc_init
+    }
 }
 
 /// `MulHasher` multiplies each character by a constant and xor's them together under rotations.
@@ -193,6 +200,8 @@ pub struct MulHasher<const CANONICAL: bool = true, const R: u32 = 7> {
     k: usize,
     rot: u32,
     mul: u32,
+    fw_init: u32,
+    rc_init: u32,
 }
 
 impl<const CANONICAL: bool, const R: u32> MulHasher<CANONICAL, R> {
@@ -216,14 +225,27 @@ impl<const CANONICAL: bool, const R: u32> CharHasher for MulHasher<CANONICAL, R>
 
     #[inline(always)]
     fn new_with_seed(k: usize, seed: Option<u32>) -> Self {
+        let mul = C ^ match seed {
+            None => 0,
+            // don't change parity,
+            Some(seed) => (SeedHasher::new().hash_one(seed) as u32) << 1,
+        };
+
+        // Initial value of hashing `k-1` zeros.
+        let fw_init = 0u32;
+
+        // Initial value of reverse-complement-hashing `k-1` zeros.
+        let mut rc_init = 0u32;
+        for _ in 0..k - 1 {
+            rc_init = rc_init.rotate_right(Self::R) ^ (complement_base(0) as u32).wrapping_mul(mul);
+        }
+
         Self {
             k,
             rot: (k as u32 - 1) % 32,
-            mul: C ^ match seed {
-                None => 0,
-                // don't change parity,
-                Some(seed) => (SeedHasher::new().hash_one(seed) as u32) << 1,
-            },
+            mul,
+            fw_init,
+            rc_init,
         }
     }
 
@@ -270,6 +292,14 @@ impl<const CANONICAL: bool, const R: u32> CharHasher for MulHasher<CANONICAL, R>
         let r = packed_seq::complement_base_simd(b) * self.mul.into();
         let rot = self.rot * R % 32;
         (r << rot) | (r >> (32 - rot))
+    }
+    #[inline(always)]
+    fn fw_init(&self) -> u32 {
+        self.fw_init
+    }
+    #[inline(always)]
+    fn rc_init(&self) -> u32 {
+        self.rc_init
     }
 }
 
