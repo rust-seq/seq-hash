@@ -129,6 +129,7 @@ pub trait KmerHasher {
         }
     }
 
+    #[inline(always)]
     fn in_out_mapper_ambiguous_simd<'s>(
         &self,
         nseq: PackedNSeq<'s>,
