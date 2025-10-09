@@ -339,12 +339,14 @@ impl<CH: CharHasher> KmerHasher for CH {
         assert!(seq.bits_per_char() <= CH::BITS_PER_CHAR);
         let mut fw = S::splat(self.fw_init());
         let mut rc = S::splat(self.rc_init());
+        let shl = S::splat(CH::R);
+        let shr = S::splat(32 - CH::R);
 
         move |(a, r)| {
-            let fw_out = ((fw << CH::R) | (fw >> (32 - CH::R))) ^ self.simd_f(a);
+            let fw_out = ((fw << shl) | (fw >> shr)) ^ self.simd_f(a);
             fw = fw_out ^ self.simd_f_rot(r);
             if Self::CANONICAL {
-                let rc_out = ((rc >> CH::R) | (rc << (32 - CH::R))) ^ self.simd_c_rot(a);
+                let rc_out = ((rc >> shl) | (rc << shr)) ^ self.simd_c_rot(a);
                 rc = rc_out ^ self.simd_c(r);
                 // Wrapping SIMD add
                 fw_out + rc_out
