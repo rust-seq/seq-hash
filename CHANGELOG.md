@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1
+- perf: precompute initial hash values.
+- perf: more `inline(always)`
+- perf: Avoid slow `u32x8::splat` on NEON.
+- perf: bump to packed-seq 4.2.0
+
 ## 0.1.0
 - feat: Use `PackedNSeq` wrapper type introduced by `packed-seq` 4.1.0.
 - feat: Add `scalar` feature that disabled the `packed-seq` error when native
