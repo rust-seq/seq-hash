@@ -1,5 +1,9 @@
 # Changelog
 
+## git
+- doc: update readme to link to `ensure_simd` docs.
+- misc: cargo update
+
 ## 0.1.1
 - perf: precompute initial hash values.
 - perf: more `inline(always)`
