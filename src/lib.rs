@@ -225,15 +225,15 @@ pub trait KmerHasher {
         let k = self.k();
         let delay = self.delay();
         let mut hash_mapper = self.in_out_mapper_simd(nseq.seq);
+        let mut ambiguity_it = nseq
+            .ambiguous
+            .par_iter_kmer_ambiguity(k, context + k - 1, 0);
         nseq.seq
             .par_iter_bp_delayed_with_factor(context + k - 1, delay, 2)
-            .zip(
-                nseq.ambiguous
-                    .par_iter_kmer_ambiguity(k, context + k - 1, 0),
-            )
             .map(
                 #[inline(always)]
-                move |((a, r), is_ambiguous)| {
+                move |(a, r)| {
+                    let is_ambiguous = ambiguity_it.it.next().unwrap();
                     let hash = hash_mapper((a, r));
                     is_ambiguous.blend(S::MAX, hash)
                 },
