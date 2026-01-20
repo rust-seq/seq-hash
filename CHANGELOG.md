@@ -1,8 +1,8 @@
 # Changelog
 
-## git
+<!-- next-header -->
 
-## 0.1.2
+## git
 - perf: slightly improve codegen for `hash_valid_kmers_simd` by avoiding `zip`.
   (Instead just call `.next()` manually.)
 - doc: update readme to link to `ensure_simd` docs.
