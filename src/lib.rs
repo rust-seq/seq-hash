@@ -233,7 +233,8 @@ pub trait KmerHasher {
             .map(
                 #[inline(always)]
                 move |(a, r)| {
-                    let is_ambiguous = ambiguity_it.it.next().unwrap();
+                    // SAFETY: these iterators have the same length.
+                    let is_ambiguous = unsafe { ambiguity_it.it.next().unwrap_unchecked() };
                     let hash = hash_mapper((a, r));
                     is_ambiguous.blend(S::MAX, hash)
                 },
