@@ -12,7 +12,7 @@ Please cite the
 [`simd-minimizers`](https://github.com/rust-seq/simd-minimizers) paper, for which this
 crate was developed:
 
-- SimdMinimizers: Computing Random Minimizers, fast.  
+- SimdMinimizers: Computing Random Minimizers, fast.
   Ragnar Groot Koerkamp, Igor Martayan.
   SEA 2025 [https://doi.org/10.4230/LIPIcs.SEA.2025.20](doi.org/10.4230/LIPIcs.SEA.2025.20)
 
@@ -45,5 +45,5 @@ let hasher = <NtHasher>::new(k);
 
 // Consider a 'context' of a single kmer.
 let hashes: Vec<_> = hasher.hash_kmers_simd(packed_seq.as_slice(), 1).collect();
-assert_eq!(hashes.len(), seq.len() - (k-1)
+assert_eq!(hashes.len(), seq.len() - (k-1));
 ```
