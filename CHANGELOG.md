@@ -3,6 +3,11 @@
 <!-- next-header -->
 
 ## git
+- Bump `packed-seq`, new `wide` version with potential breaking syntax changes:
+  - `.as_array_ref()` -> `.as_array()`
+  - `.as_array_mut()` -> `.as_mut_array()`
+  - `.cmp_eq` / `.cmp_gt` / `.cmp_lt` -> `.simd_eq` / `.simd_gt` / `.simd_lt`
+  - `.move_mask()` -> `.to_bitmask()`
 
 ## 0.1.2
 - perf: slightly improve codegen for `hash_valid_kmers_simd` by avoiding `zip`.
