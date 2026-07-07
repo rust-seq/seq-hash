@@ -44,7 +44,7 @@ fn _table_lookup(t: S, idx: S) -> S {
 #[cfg(not(any(target_feature = "avx", target_feature = "neon")))]
 fn _table_lookup(t: S, idx: S) -> S {
     unsafe {
-        let t = t.as_array_ref();
+        let t = t.as_array();
         S::new(idx.to_array().map(|i| *t.get_unchecked(i as usize)))
     }
 }
