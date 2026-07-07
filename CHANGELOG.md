@@ -5,8 +5,6 @@
 ## git
 
 ## 0.2.0
-
-## 0.2.0
 - Bump `packed-seq`, new `wide` version with potential breaking syntax changes:
   - `.as_array_ref()` -> `.as_array()`
   - `.as_array_mut()` -> `.as_mut_array()`
