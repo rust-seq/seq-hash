@@ -33,6 +33,7 @@ RUSTFLAGS="-C target-cpu=native" cargo run --release
 Full documentation can be found on [docs.rs](https://docs.rs/seq-hash).
 
 ```rust
+use seq_hash::packed_seq;
 use packed_seq::{AsciiSeqVec, PackedSeqVec, SeqVec};
 use seq_hash::{KmerHasher, NtHasher};
 

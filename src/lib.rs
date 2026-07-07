@@ -17,6 +17,7 @@
 //! Then call either `hasher.hash_kmers_simd(seq, context)`,
 //! or use the underlying 'mapper' via `hasher.in_out_mapper_simd(seq)`.
 //! ```
+//! use seq_hash::packed_seq;
 //! use packed_seq::{AsciiSeqVec, PackedSeqVec, SeqVec};
 //! use seq_hash::{KmerHasher, NtHasher};
 //! let k = 3;
