@@ -9,7 +9,7 @@ use crate::KmerHasher;
 use crate::S;
 use packed_seq::Seq;
 use packed_seq::complement_base;
-use wide::u32x8;
+use packed_seq::u32x8;
 
 type SeedHasher = BuildHasherDefault<DefaultHasher>;
 
@@ -200,6 +200,7 @@ pub struct MulHasher<const CANONICAL: bool = true, const R: u32 = 7> {
     k: usize,
     rot: u32,
     mul: u32,
+    simd_mul: u32x8,
     fw_init: u32,
     rc_init: u32,
 }
@@ -231,11 +232,12 @@ impl<const CANONICAL: bool, const R: u32> CharHasher for MulHasher<CANONICAL, R>
             // don't change parity,
             Some(seed) => (SeedHasher::new().hash_one(seed) as u32) << 1,
         };
+        let simd_mul = u32x8::splat(mul);
 
         // Initial value of hashing `k-1` zeros.
         let mut fw_init = 0u32;
         for _ in 0..k - 1 {
-            fw_init = fw_init.rotate_left(Self::R) ^ (0 as u32).wrapping_mul(mul);
+            fw_init = fw_init.rotate_left(Self::R) ^ 0u32.wrapping_mul(mul);
         }
 
         // Initial value of reverse-complement-hashing `k-1` zeros.
@@ -251,6 +253,7 @@ impl<const CANONICAL: bool, const R: u32> CharHasher for MulHasher<CANONICAL, R>
             k,
             rot,
             mul,
+            simd_mul,
             fw_init,
             rc_init,
         }
@@ -282,21 +285,21 @@ impl<const CANONICAL: bool, const R: u32> CharHasher for MulHasher<CANONICAL, R>
 
     #[inline(always)]
     fn simd_f(&self, b: u32x8) -> u32x8 {
-        b * self.mul.into()
+        b * self.simd_mul
     }
     #[inline(always)]
     fn simd_c(&self, b: u32x8) -> u32x8 {
-        packed_seq::complement_base_simd(b) * self.mul.into()
+        packed_seq::complement_base_simd(b) * self.simd_mul
     }
     #[inline(always)]
     fn simd_f_rot(&self, b: u32x8) -> u32x8 {
-        let r = b * self.mul.into();
+        let r = b * self.simd_mul;
         let rot = self.rot * R % 32;
         (r << rot) | (r >> (32 - rot))
     }
     #[inline(always)]
     fn simd_c_rot(&self, b: u32x8) -> u32x8 {
-        let r = packed_seq::complement_base_simd(b) * self.mul.into();
+        let r = packed_seq::complement_base_simd(b) * self.simd_mul;
         let rot = self.rot * R % 32;
         (r << rot) | (r >> (32 - rot))
     }

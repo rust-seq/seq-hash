@@ -70,7 +70,7 @@ pub use packed_seq;
 use packed_seq::{ChunkIt, Delay, PackedNSeq, PaddedIt, Seq};
 use std::iter::{repeat, zip};
 
-type S = wide::u32x8;
+type S = packed_seq::u32x8;
 
 /// A hasher that can hash all k-mers in a string.
 ///
