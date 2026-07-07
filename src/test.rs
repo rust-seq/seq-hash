@@ -1,7 +1,7 @@
 use super::*;
 use itertools::Itertools;
 use packed_seq::{AsciiSeq, AsciiSeqVec, PackedSeq, PackedSeqVec, SeqVec};
-use rand::{Rng, random_range};
+use rand::{RngExt, random_range};
 use std::sync::LazyLock;
 
 /// Swap G and T, so that the lex order is the same as for the packed version.
