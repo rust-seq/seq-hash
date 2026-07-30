@@ -21,6 +21,8 @@ pub struct AntiLexHasher<const CANONICAL: bool> {
     b: usize,
     /// Number of bits to shift each new character up to make it the most significant one.
     shift: u32,
+    /// Shift to get everything into the most significant positions.
+    left_shift: u32,
     /// Mask to flip the bits of the most significant character.
     anti: u32,
     /// Mask to keep only the lowest k*b bits.
@@ -43,6 +45,7 @@ impl<const CANONICAL: bool> AntiLexHasher<CANONICAL> {
             k,
             b,
             shift,
+            left_shift: 32u32.saturating_sub((b * k) as u32),
             anti,
             mask,
         }
@@ -68,7 +71,7 @@ impl KmerHasher for AntiLexHasher<false> {
         let mut fw: u32 = 0;
         move |(a, _r)| {
             fw = (fw >> self.b) ^ ((a as u32) << self.shift);
-            fw ^ self.anti
+            (fw ^ self.anti) << self.left_shift
         }
     }
 
@@ -79,7 +82,7 @@ impl KmerHasher for AntiLexHasher<false> {
         let mut fw: S = S::splat(0);
         move |(a, _r)| {
             fw = (fw >> self.b as u32) ^ (a << self.shift);
-            fw ^ S::splat(self.anti)
+            (fw ^ S::splat(self.anti)) << self.left_shift
         }
     }
 
@@ -97,7 +100,7 @@ impl KmerHasher for AntiLexHasher<false> {
         let mut fw: u32 = 0;
         move |a| {
             fw = (fw >> self.b) ^ ((a as u32) << shift);
-            fw ^ anti
+            (fw ^ anti) << self.left_shift
         }
     }
 }
@@ -147,7 +150,7 @@ impl KmerHasher for AntiLexHasher<true> {
             }
             i += 1;
 
-            out
+            out << self.left_shift
         }
     }
 
@@ -161,7 +164,7 @@ impl KmerHasher for AntiLexHasher<true> {
             fw = (fw >> self.b) ^ ((a as u32) << self.shift);
             // ^2 for complement.
             rc = ((rc << self.b) & self.mask) ^ (r as u32 ^ 2);
-            min(fw ^ self.anti, rc ^ self.anti)
+            min(fw ^ self.anti, rc ^ self.anti) << self.left_shift
         }
     }
 
@@ -174,7 +177,7 @@ impl KmerHasher for AntiLexHasher<true> {
         move |(a, r)| {
             fw = (fw >> self.b as u32) ^ (a << self.shift);
             rc = ((rc << self.b as u32) & S::splat(self.mask)) ^ (r ^ S::splat(2));
-            (fw ^ S::splat(self.anti)).min(rc ^ S::splat(self.anti))
+            (fw ^ S::splat(self.anti)).min(rc ^ S::splat(self.anti)) << self.left_shift
         }
     }
 }
