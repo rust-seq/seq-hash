@@ -67,6 +67,7 @@ pub use nthash::{MulHasher, NtHasher};
 
 /// Re-export of the `packed-seq` crate.
 pub use packed_seq;
+pub use packed_seq::wide;
 
 use packed_seq::{ChunkIt, Delay, PackedNSeq, PaddedIt, Seq};
 use std::iter::{repeat, zip};
