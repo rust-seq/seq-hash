@@ -1,6 +1,6 @@
 use crate::S;
 
-/// Given a 'table' `t` consisting of 8 values, and an index `idx` consisting of 8 indices from 0 to 4,
+/// Given a 'table' `t` consisting of `LANES` values, and an index `idx` consisting of `LANES` indices from 0 to 4,
 /// look up the first four indices in the first half of `t`, and the second four indices in the second half of `t`.
 #[inline(always)]
 pub fn table_lookup(t: S, idx: S) -> S {
@@ -28,8 +28,8 @@ fn _table_lookup(t: S, idx: S) -> S {
         use core::arch::aarch64::{uint8x16_t, vqtbl1q_u8};
         use core::mem::transmute;
 
-        const OFFSET: S = unsafe { std::mem::transmute([0x03_02_01_00; 8]) };
-        const MASK: S = unsafe { std::mem::transmute([0x04_04_04_04; 8]) };
+        const OFFSET: S = unsafe { std::mem::transmute([0x03_02_01_00; crate::LANES]) };
+        const MASK: S = unsafe { std::mem::transmute([0x04_04_04_04; crate::LANES]) };
 
         let idx = idx * MASK + OFFSET;
         let (t1, t2): (uint8x16_t, uint8x16_t) = transmute(t);

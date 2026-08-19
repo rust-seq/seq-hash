@@ -6,6 +6,7 @@ use std::hash::DefaultHasher;
 
 use super::intrinsics;
 use crate::KmerHasher;
+use crate::LANES;
 use crate::S;
 use packed_seq::Seq;
 use packed_seq::complement_base;
@@ -48,13 +49,13 @@ pub trait CharHasher: Clone {
     fn f_rot(&self, b: u8) -> u32;
     /// Hash the reverse complement of `b`, right rotated by `(k-1)*R` steps.
     fn c_rot(&self, b: u8) -> u32;
-    /// SIMD-version of [`f()`], looking up 8 characters at a time.
+    /// SIMD-version of [`f()`], looking up `LANES` characters at a time.
     fn simd_f(&self, b: S) -> S;
-    /// SIMD-version of [`c()`], looking up 8 characters at a time.
+    /// SIMD-version of [`c()`], looking up `LANES` characters at a time.
     fn simd_c(&self, b: S) -> S;
-    /// SIMD-version of [`f_rot()`], looking up 8 characters at a time.
+    /// SIMD-version of [`f_rot()`], looking up `LANES` characters at a time.
     fn simd_f_rot(&self, b: S) -> S;
-    /// SIMD-version of [`c_rot()`], looking up 8 characters at a time.
+    /// SIMD-version of [`c_rot()`], looking up `LANES` characters at a time.
     fn simd_c_rot(&self, b: S) -> S;
 
     fn fw_init(&self) -> u32;
@@ -108,7 +109,7 @@ impl<const CANONICAL: bool, const R: u32> CharHasher for NtHasher<CANONICAL, R> 
         let c = from_fn(|i| f[complement_base(i as u8) as usize]);
         let f_rot = f.map(|h| h.rotate_left(rot * R));
         let c_rot = c.map(|h| h.rotate_left(rot * R));
-        let idx = [0, 1, 2, 3, 0, 1, 2, 3];
+        let idx: [usize; LANES] = std::array::from_fn(|i| i % 4);
         let simd_f = idx.map(|i| f[i]).into();
         let simd_c = idx.map(|i| c[i]).into();
         let simd_f_rot = idx.map(|i| f_rot[i]).into();
