@@ -106,7 +106,7 @@ pub trait KmerHasher {
     fn in_out_mapper_scalar<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((u8, u8)) -> u32;
     /// A SIMD mapper function that should be called with a `(in, out)` base per lane.
     ///
-    /// The delay should be [`Self::delay()`]. The first `delay` calls should have `out=u32x8::splat(0)`.
+    /// The delay should be [`Self::delay()`]. The first `delay` calls should have `out=S::splat(0)`.
     /// `seq` is only used to ensure that the hasher can handle the underlying alphabet.
     fn in_out_mapper_simd<'s>(&self, seq: impl Seq<'s>) -> impl FnMut((S, S)) -> S;
 

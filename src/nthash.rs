@@ -9,7 +9,6 @@ use crate::KmerHasher;
 use crate::S;
 use packed_seq::Seq;
 use packed_seq::complement_base;
-use packed_seq::u32x8;
 
 type SeedHasher = BuildHasherDefault<DefaultHasher>;
 
@@ -50,13 +49,13 @@ pub trait CharHasher: Clone {
     /// Hash the reverse complement of `b`, right rotated by `(k-1)*R` steps.
     fn c_rot(&self, b: u8) -> u32;
     /// SIMD-version of [`f()`], looking up 8 characters at a time.
-    fn simd_f(&self, b: u32x8) -> u32x8;
+    fn simd_f(&self, b: S) -> S;
     /// SIMD-version of [`c()`], looking up 8 characters at a time.
-    fn simd_c(&self, b: u32x8) -> u32x8;
+    fn simd_c(&self, b: S) -> S;
     /// SIMD-version of [`f_rot()`], looking up 8 characters at a time.
-    fn simd_f_rot(&self, b: u32x8) -> u32x8;
+    fn simd_f_rot(&self, b: S) -> S;
     /// SIMD-version of [`c_rot()`], looking up 8 characters at a time.
-    fn simd_c_rot(&self, b: u32x8) -> u32x8;
+    fn simd_c_rot(&self, b: S) -> S;
 
     fn fw_init(&self) -> u32;
     fn rc_init(&self) -> u32;
@@ -74,10 +73,10 @@ pub struct NtHasher<const CANONICAL: bool = true, const R: u32 = 7> {
     c: [u32; 4],
     f_rot: [u32; 4],
     c_rot: [u32; 4],
-    simd_f: u32x8,
-    simd_c: u32x8,
-    simd_f_rot: u32x8,
-    simd_c_rot: u32x8,
+    simd_f: S,
+    simd_c: S,
+    simd_f_rot: S,
+    simd_c_rot: S,
     fw_init: u32,
     rc_init: u32,
 }
@@ -165,19 +164,19 @@ impl<const CANONICAL: bool, const R: u32> CharHasher for NtHasher<CANONICAL, R> 
     }
 
     #[inline(always)]
-    fn simd_f(&self, b: u32x8) -> u32x8 {
+    fn simd_f(&self, b: S) -> S {
         intrinsics::table_lookup(self.simd_f, b)
     }
     #[inline(always)]
-    fn simd_c(&self, b: u32x8) -> u32x8 {
+    fn simd_c(&self, b: S) -> S {
         intrinsics::table_lookup(self.simd_c, b)
     }
     #[inline(always)]
-    fn simd_f_rot(&self, b: u32x8) -> u32x8 {
+    fn simd_f_rot(&self, b: S) -> S {
         intrinsics::table_lookup(self.simd_f_rot, b)
     }
     #[inline(always)]
-    fn simd_c_rot(&self, b: u32x8) -> u32x8 {
+    fn simd_c_rot(&self, b: S) -> S {
         intrinsics::table_lookup(self.simd_c_rot, b)
     }
     #[inline(always)]
@@ -200,7 +199,7 @@ pub struct MulHasher<const CANONICAL: bool = true, const R: u32 = 7> {
     k: usize,
     rot: u32,
     mul: u32,
-    simd_mul: u32x8,
+    simd_mul: S,
     fw_init: u32,
     rc_init: u32,
 }
@@ -232,7 +231,7 @@ impl<const CANONICAL: bool, const R: u32> CharHasher for MulHasher<CANONICAL, R>
             // don't change parity,
             Some(seed) => (SeedHasher::new().hash_one(seed) as u32) << 1,
         };
-        let simd_mul = u32x8::splat(mul);
+        let simd_mul = S::splat(mul);
 
         // Initial value of hashing `k-1` zeros.
         let mut fw_init = 0u32;
@@ -284,21 +283,21 @@ impl<const CANONICAL: bool, const R: u32> CharHasher for MulHasher<CANONICAL, R>
     }
 
     #[inline(always)]
-    fn simd_f(&self, b: u32x8) -> u32x8 {
+    fn simd_f(&self, b: S) -> S {
         b * self.simd_mul
     }
     #[inline(always)]
-    fn simd_c(&self, b: u32x8) -> u32x8 {
+    fn simd_c(&self, b: S) -> S {
         packed_seq::complement_base_simd(b) * self.simd_mul
     }
     #[inline(always)]
-    fn simd_f_rot(&self, b: u32x8) -> u32x8 {
+    fn simd_f_rot(&self, b: S) -> S {
         let r = b * self.simd_mul;
         let rot = self.rot * R % 32;
         (r << rot) | (r >> (32 - rot))
     }
     #[inline(always)]
-    fn simd_c_rot(&self, b: u32x8) -> u32x8 {
+    fn simd_c_rot(&self, b: S) -> S {
         let r = packed_seq::complement_base_simd(b) * self.simd_mul;
         let rot = self.rot * R % 32;
         (r << rot) | (r >> (32 - rot))
