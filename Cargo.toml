@@ -10,13 +10,15 @@ authors = ["Ragnar Groot Koerkamp", "Igor Martayan"]
 description = "A SIMD-accelerated library to compute hashes of DNA sequences"
 
 [dependencies]
-packed-seq = "5.0"
+# packed-seq = "5.0"
+packed-seq = { git = "https://github.com/rust-seq/packed-seq", branch = "avx512-take2"}
 
 [dev-dependencies]
 itertools = "0.15"
 rand = "0.10"
 
 [features]
+avx512 = ["packed-seq/avx512"]
 scalar = ["packed-seq/scalar"]
 
 [profile.release]

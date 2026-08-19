@@ -10,6 +10,7 @@ pub fn table_lookup(t: S, idx: S) -> S {
 #[inline(always)]
 #[cfg(target_feature = "avx")]
 fn _table_lookup(t: S, idx: S) -> S {
+    #[cfg(not(feature = "avx512"))]
     unsafe {
         #[cfg(target_arch = "x86")]
         use core::arch::x86::_mm256_permutevar_ps;
@@ -18,6 +19,13 @@ fn _table_lookup(t: S, idx: S) -> S {
         use core::mem::transmute;
 
         transmute(_mm256_permutevar_ps(transmute(t), transmute(idx)))
+    }
+    #[cfg(feature = "avx512")]
+    unsafe {
+        use core::arch::x86_64::_mm512_permutevar_ps;
+        use core::mem::transmute;
+
+        transmute(_mm512_permutevar_ps(transmute(t), transmute(idx)))
     }
 }
 
@@ -51,8 +59,10 @@ fn _table_lookup(t: S, idx: S) -> S {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(not(feature = "avx512"))]
     use super::*;
 
+    #[cfg(not(feature = "avx512"))]
     #[test]
     fn test_table_lookup() {
         let t = S::new([1000, 1001, 1002, 1003, 1000, 1001, 1002, 1003]);

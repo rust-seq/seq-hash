@@ -71,8 +71,8 @@ pub use packed_seq;
 use packed_seq::{ChunkIt, Delay, PackedNSeq, PaddedIt, Seq};
 use std::iter::{repeat, zip};
 
-type S = packed_seq::u32x8;
-const LANES: usize = 8;
+type S = packed_seq::S;
+const LANES: usize = packed_seq::L;
 
 /// A hasher that can hash all k-mers in a string.
 ///
