@@ -41,7 +41,28 @@ fn _table_lookup(t: S, idx: S) -> S {
 }
 
 #[inline(always)]
-#[cfg(not(any(target_feature = "avx", target_feature = "neon")))]
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+fn _table_lookup(t: S, idx: S) -> S {
+    unsafe {
+        use core::arch::wasm32::{i8x16_swizzle, v128};
+        use core::mem::transmute;
+
+        const OFFSET: S = unsafe { std::mem::transmute([0x03_02_01_00; 8]) };
+        const MASK: S = unsafe { std::mem::transmute([0x04_04_04_04; 8]) };
+
+        let idx = idx * MASK + OFFSET;
+        let (t1, t2): (v128, v128) = transmute(t);
+        let (i1, i2): (v128, v128) = transmute(idx);
+        transmute((i8x16_swizzle(t1, i1), i8x16_swizzle(t2, i2)))
+    }
+}
+
+#[inline(always)]
+#[cfg(not(any(
+    target_feature = "avx",
+    target_feature = "neon",
+    all(target_arch = "wasm32", target_feature = "simd128")
+)))]
 fn _table_lookup(t: S, idx: S) -> S {
     unsafe {
         let t = t.as_array();
