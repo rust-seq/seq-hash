@@ -14,7 +14,7 @@ packed-seq = { version = "5.0", default-features = false }
 
 [dev-dependencies]
 itertools = "0.15"
-packed-seq = { version = "5.0", features = ["rand"] }
+packed-seq = { version = "5.0", default-features = false, features = ["rand"] }
 rand = "0.10"
 
 [features]
