@@ -141,7 +141,7 @@ pub trait KmerHasher {
         move |(a, r)| {
             let hash = mapper((a, r));
             let ambiguous = ambiguous.it.next().unwrap();
-            ambiguous.blend(S::MAX, hash)
+            ambiguous.select(S::MAX, hash)
         }
     }
 
@@ -237,7 +237,7 @@ pub trait KmerHasher {
                     // SAFETY: these iterators have the same length.
                     let is_ambiguous = unsafe { ambiguity_it.it.next().unwrap_unchecked() };
                     let hash = hash_mapper((a, r));
-                    is_ambiguous.blend(S::MAX, hash)
+                    is_ambiguous.select(S::MAX, hash)
                 },
             )
             .advance(k - 1)
