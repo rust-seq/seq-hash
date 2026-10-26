@@ -4,6 +4,11 @@
 
 ## git
 
+- Support for wasm / simd128.
+- Some small perf improvements in NtHashing from replacing `x << Simd::splat(1)`
+  by `x << 1` [#4](https://github.com/rust-seq/seq-hash/pull/4).
+- Disable unused default features of `packed-seq`.
+
 ## 0.2.0
 - Bump `packed-seq`, new `wide` version with potential breaking syntax changes:
   - `.as_array_ref()` -> `.as_array()`
