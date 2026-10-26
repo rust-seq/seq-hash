@@ -4,6 +4,8 @@
 
 ## git
 
+## 0.2.1
+
 - Support for wasm / simd128.
 - Some small perf improvements in NtHashing from replacing `x << Simd::splat(1)`
   by `x << 1` [#4](https://github.com/rust-seq/seq-hash/pull/4).
